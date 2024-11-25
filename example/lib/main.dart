@@ -4,6 +4,7 @@ import 'package:custom_activity_recognition/activity_types.dart';
 import 'package:custom_activity_recognition/custom_activity_recognition.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(MaterialApp(home: const ActivityRecognitionApp()));
@@ -66,11 +67,22 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
   Future<void> _checkPermissionsAndAvailability() async {
     final isAvailable = await _activityRecognition.isAvailable();
     if (isAvailable) {
-      final hasPermissions = await _activityRecognition.requestPermissions();
-      if (hasPermissions) {
-        _setupActivityStream();
+      final isPermanentlyDenied =
+          await Permission.activityRecognition.isPermanentlyDenied;
+
+      if (isPermanentlyDenied) {
+        await openAppSettings();
       } else {
-        _showError('Activity recognition permissions are required');
+        bool isGranted = await Permission.activityRecognition.isGranted;
+        if (!isGranted) {
+          isGranted = await Permission.activityRecognition.request().isGranted;
+          if (!isGranted) {
+            _showError('Activity recognition permissions are required');
+          }
+        }
+        if (isGranted) {
+          _setupActivityStream();
+        }
       }
     } else {
       _showError('Activity recognition is not available on this device');
@@ -113,7 +125,14 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () async {
+              await _checkPermissionsAndAvailability();
+            }),
+      ),
     );
   }
 }

@@ -76,7 +76,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                     arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
                     PERMISSION_REQUEST_CODE
                 )
-                callback(true)
+                callback(false)
             } else {
                 callback(true)
             }
