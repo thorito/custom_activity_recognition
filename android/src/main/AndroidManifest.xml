@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="com.aikotelematics.custom_activity_recognition">
+
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
+
+    <application>
+        <receiver
+            android:name=".ActivityTransitionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+    </application>
+
+</manifest>

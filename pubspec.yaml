@@ -1,0 +1,28 @@
+name: custom_activity_recognition
+description: "This plugin is used to recognize user activity transition on Android and iOS platforms."
+version: 0.0.1
+homepage: https://github.com/thorito/custom_activity_recognition
+
+environment:
+  sdk: ^3.5.4
+  flutter: '>=3.3.0'
+
+dependencies:
+  equatable: ^2.0.7
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.aikotelematics.custom_activity_recognition
+        pluginClass: CustomActivityRecognitionPlugin
+      ios:
+        pluginClass: CustomActivityRecognitionPlugin

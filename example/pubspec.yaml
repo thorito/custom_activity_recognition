@@ -1,0 +1,27 @@
+name: custom_activity_recognition_example
+description: "Demonstrates how to use the custom_activity_recognition plugin."
+version: 0.0.1
+publish_to: 'none'
+
+environment:
+  sdk: ^3.5.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  custom_activity_recognition:
+    path: ../
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  integration_test:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
