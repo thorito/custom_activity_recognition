@@ -21,22 +21,22 @@ class ActivityData {
 
 > **Android**:
 >
-    * IN_VEHICLE
-    * ON_BICYCLE
-    * RUNNING
-    * ON_FOOT
-    * WALKING
-    * TILTING
-    * STILL
-    * UNKNOWN
+>    * IN_VEHICLE
+>    * ON_BICYCLE
+>    * RUNNING
+>    * ON_FOOT
+>    * WALKING
+>    * TILTING
+>    * STILL
+>    * UNKNOWN
 
 ---
 
 > **iOS**:
 >
-    * IN_VEHICLE
-    * ON_BICYCLE
-    * RUNNING
-    * WALKING
-    * STILL
-    * UNKNOWN
+>    * IN_VEHICLE
+>    * ON_BICYCLE
+>    * RUNNING
+>    * WALKING
+>    * STILL
+>    * UNKNOWN
