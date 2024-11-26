@@ -15,33 +15,17 @@ import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionRequest
 import com.google.android.gms.location.DetectedActivity
 import io.flutter.plugin.common.EventChannel
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
 
 class ActivityRecognitionManager(private val context: Context) : EventChannel.StreamHandler {
+    companion object {
+        private const val PERMISSION_REQUEST_CODE = 100
+    }
+
     private var eventSink: EventChannel.EventSink? = null
     private val activityRecognitionClient = ActivityRecognition.getClient(context)
     private var pendingIntent: PendingIntent? = null
-    private val PERMISSION_REQUEST_CODE = 100
-
-    companion object {
-        private val activityUpdateChannel = Channel<Map<String, Any>>(Channel.CONFLATED)
-        val lastActivity = MutableStateFlow<Map<String, Any>?>(null)
-    }
 
     private val transitions = listOf(
-        ActivityTransition.Builder()
-            .setActivityType(DetectedActivity.STILL)
-            .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-            .build(),
-        ActivityTransition.Builder()
-            .setActivityType(DetectedActivity.WALKING)
-            .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-            .build(),
-        ActivityTransition.Builder()
-            .setActivityType(DetectedActivity.RUNNING)
-            .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-            .build(),
         ActivityTransition.Builder()
             .setActivityType(DetectedActivity.IN_VEHICLE)
             .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
@@ -49,19 +33,29 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         ActivityTransition.Builder()
             .setActivityType(DetectedActivity.ON_BICYCLE)
             .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-            .build()
+            .build(),
+        ActivityTransition.Builder()
+            .setActivityType(DetectedActivity.RUNNING)
+            .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+            .build(),
+        ActivityTransition.Builder()
+            .setActivityType(DetectedActivity.ON_FOOT)
+            .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+            .build(),
+        ActivityTransition.Builder()
+            .setActivityType(DetectedActivity.WALKING)
+            .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+            .build(),
+        ActivityTransition.Builder()
+            .setActivityType(DetectedActivity.STILL)
+            .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+            .build(),
     )
 
     fun isAvailable(): Boolean {
-        val packageManager = context.packageManager
-        return if (SDK_INT >= VERSION_CODES.KITKAT) {
-            packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER) &&
-                    packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_DETECTOR)
-        } else {
-            return false
-        }
+        return context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER) &&
+                context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_DETECTOR)
     }
-
 
     fun requestPermissions(activity: Activity, callback: (Boolean) -> Unit) {
 

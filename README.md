@@ -26,7 +26,6 @@ class ActivityData {
 >    * RUNNING
 >    * ON_FOOT
 >    * WALKING
->    * TILTING
 >    * STILL
 >    * UNKNOWN
 
