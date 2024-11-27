@@ -73,13 +73,7 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
       if (isPermanentlyDenied) {
         await openAppSettings();
       } else {
-        bool isGranted = await Permission.activityRecognition.isGranted;
-        if (!isGranted) {
-          isGranted = await Permission.activityRecognition.request().isGranted;
-          if (!isGranted) {
-            _showError('Activity recognition permissions are required');
-          }
-        }
+        final isGranted = await _activityRecognition.requestPermissions();
         if (isGranted) {
           _setupActivityStream();
         }

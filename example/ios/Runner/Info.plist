@@ -47,5 +47,10 @@
 	</array>
 	<key>NSMotionUsageDescription</key>
     <string>Detects human activity</string>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>motion</string>
+    </array>
 </dict>
 </plist>

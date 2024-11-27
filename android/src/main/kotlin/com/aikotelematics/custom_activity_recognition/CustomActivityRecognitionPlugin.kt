@@ -2,6 +2,7 @@ package com.aikotelematics.custom_activity_recognition
 
 import android.app.Activity
 import android.content.Context
+import android.util.Log
 import androidx.annotation.NonNull
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -18,14 +19,13 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.BinaryMessenger
 
 /** CustomActivityRecognitionPlugin */
-class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, DefaultLifecycleObserver {
+class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var methodChannel: MethodChannel
   private lateinit var eventChannel: EventChannel
   private lateinit var context: Context
   private var activity: Activity? = null
   private lateinit var activityRecognitionManager: ActivityRecognitionManager
   private var binaryMessenger: BinaryMessenger? = null
-  private var lifecycle: Lifecycle? = null
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     context = flutterPluginBinding.applicationContext
@@ -37,12 +37,13 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
     methodChannel = MethodChannel(messenger, "com.aikotelematics.custom_activity_recognition/methods")
     eventChannel = EventChannel(messenger, "com.aikotelematics.custom_activity_recognition/events")
 
-    activityRecognitionManager = ActivityRecognitionManager(context)
+    activityRecognitionManager = ActivityRecognitionManager(context.applicationContext)
     methodChannel.setMethodCallHandler(this)
     eventChannel.setStreamHandler(activityRecognitionManager)
   }
 
   private fun teardownChannels() {
+    cleanupResources()
     methodChannel.setMethodCallHandler(null)
     eventChannel.setStreamHandler(null)
     binaryMessenger = null
@@ -80,50 +81,18 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
 
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
-    lifecycle = (binding.lifecycle as HiddenLifecycleReference).lifecycle
-    lifecycle?.addObserver(this)
   }
 
   override fun onDetachedFromActivityForConfigChanges() {
-    lifecycle?.removeObserver(this)
-    lifecycle = null
     activity = null
   }
 
   override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
     activity = binding.activity
-    lifecycle = (binding.lifecycle as HiddenLifecycleReference).lifecycle
-    lifecycle?.addObserver(this)
   }
 
   override fun onDetachedFromActivity() {
-    lifecycle?.removeObserver(this)
-    lifecycle = null
     activity = null
-  }
-
-  override fun onCreate(owner: LifecycleOwner) {
-    // Inicialización cuando se crea la actividad
-  }
-
-  override fun onStart(owner: LifecycleOwner) {
-    // La actividad se hace visible
-  }
-
-  override fun onResume(owner: LifecycleOwner) {
-    // La actividad está lista para interactuar con el usuario
-  }
-
-  override fun onPause(owner: LifecycleOwner) {
-    // La actividad está parcialmente visible pero no interactiva
-  }
-
-  override fun onStop(owner: LifecycleOwner) {
-    // La actividad ya no es visible
-  }
-
-  override fun onDestroy(owner: LifecycleOwner) {
-    cleanupResources()
   }
 
   private fun cleanupResources() {

@@ -1,8 +1,16 @@
 import Flutter
 import CoreMotion
+import UIKit
 
 class ActivityStreamHandler: NSObject, FlutterStreamHandler {
     private var eventSink: FlutterEventSink?
+    private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
+    private var backgroundTimer: Timer?
+    private var lastActivityType: String = "UNKNOWN"
+
+    deinit {
+        stopTracking(activityManager: CMMotionActivityManager())
+    }
 
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         self.eventSink = events
@@ -15,22 +23,43 @@ class ActivityStreamHandler: NSObject, FlutterStreamHandler {
     }
 
     func startTracking(activityManager: CMMotionActivityManager) {
+        endBackgroundTask()
+
+        backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask { [weak self] in
+            self?.endBackgroundTask()
+        }
+
+        backgroundTimer = Timer.scheduledTimer(withTimeInterval: 25.0, repeats: true) { [weak self] _ in
+            self?.refreshBackgroundTask()
+        }
+
         activityManager.startActivityUpdates(to: OperationQueue.main) { [weak self] (activity) in
-            guard let activity = activity else { return }
+            guard let self = self,
+                  let activity = activity else {
 
-            let activityType = self?.getActivityType(from: activity)
+                return
+            }
 
-            let activityData: [String: Any] = [
-                "timestamp": Int(Date().timeIntervalSince1970 * 1000),
-                "activity": activityType ?? "UNKNOWN"
-            ]
+            let activityType = self.getActivityType(from: activity)
 
-            self?.eventSink?(activityData)
+            if activityType != self.lastActivityType {
+                self.lastActivityType = activityType
+
+                let activityData: [String: Any] = [
+                    "timestamp": Int(Date().timeIntervalSince1970 * 1000),
+                    "activity": activityType
+                ]
+
+                self.eventSink?(activityData)
+            }
         }
     }
 
     func stopTracking(activityManager: CMMotionActivityManager) {
         activityManager.stopActivityUpdates()
+        endBackgroundTask()
+        backgroundTimer?.invalidate()
+        backgroundTimer = nil
     }
 
     private func getActivityType(from activity: CMMotionActivity) -> String {
@@ -48,4 +77,19 @@ class ActivityStreamHandler: NSObject, FlutterStreamHandler {
         return "UNKNOWN"
     }
 
+
+    private func refreshBackgroundTask() {
+        endBackgroundTask()
+
+        backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask { [weak self] in
+            self?.endBackgroundTask()
+        }
+    }
+
+    private func endBackgroundTask() {
+        if backgroundTaskIdentifier != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
+            backgroundTaskIdentifier = .invalid
+        }
+    }
 }
