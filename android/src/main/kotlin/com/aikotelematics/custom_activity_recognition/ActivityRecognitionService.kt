@@ -144,11 +144,11 @@ class ActivityRecognitionService : Service() {
             }
         )
 
-        val timestampFormatted = if (timestamp > 0) { ", ${formatTimestamp(timestamp)}" } else { "" }
+        val timestampFormatted = if (timestamp > 0) { "(${formatTimestamp(timestamp)})" } else { "" }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Activity Recognition")
-            .setContentText("Activity: $currentActivity$timestampFormatted")
+            .setContentText("$currentActivity$timestampFormatted")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
