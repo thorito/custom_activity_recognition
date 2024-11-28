@@ -36,12 +36,14 @@ class ActivityRecognitionService : Service() {
         super.onCreate()
         activityRecognitionClient = ActivityRecognition.getClient(this)
         createNotificationChannel()
+        setupActivityRecognition()
+        handler.postDelayed(updateNotificationRunnable, 5000)
         isServiceRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, createNotification())
-        handler.postDelayed(updateNotificationRunnable, 5000)
+
         Log.d(TAG, "onStartCommand: ${intent?.action}")
         when (intent?.action) {
             "UPDATE_ACTIVITY" -> {
@@ -144,7 +146,7 @@ class ActivityRecognitionService : Service() {
             }
         )
 
-        val timestampFormatted = if (timestamp > 0) { "(${formatTimestamp(timestamp)})" } else { "" }
+        val timestampFormatted = if (timestamp > 0) { " (${formatTimestamp(timestamp)})" } else { "" }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Activity Recognition")
