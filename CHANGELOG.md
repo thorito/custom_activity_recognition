@@ -1,3 +1,7 @@
+## 0.0.6
+
+* Updated documentation.
+
 ## 0.0.4
 
 * Added service for background data sync.
