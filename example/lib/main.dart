@@ -7,7 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
-  runApp(MaterialApp(home: const ActivityRecognitionApp()));
+  runApp(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const ActivityRecognitionApp(),
+    ),
+  );
 }
 
 class ActivityRecognitionApp extends StatefulWidget {

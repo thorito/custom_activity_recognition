@@ -1,13 +1,22 @@
 # custom_activity_recognition
 
-Activity recognition plugin for Android and iOS
+Activity recognition plugin for Android (**Activity Recognition Transition API**) and iOS (**CoreMotion**)
 
-## Notes
-
-* On Android use Activity Recognition Transition API
-* On iOS use CoreMotion
+|         | Android |  iOS  |
+| :------ | :-----: | :---: |
+| Support | SDK 21+ | 12.0+ |
 
 ## Getting started
+
+To use this plugin, add flutter_activity_recognition as a dependency in your pubspec.yaml file. 
+[Show video](https://youtube.com/shorts/vkVThDpTyk8?feature=share)
+
+For example:
+```yaml
+  dependencies:
+    custom_activity_recognition: ^0.0.5
+```
+
 
 * Android
   Open the AndroidManifest.xml file and add the following permissions between the <manifest> and <application> tags.
@@ -65,3 +74,7 @@ class ActivityData {
 >    * WALKING
 >    * STILL
 >    * UNKNOWN
+
+## Support
+
+If you find any bugs or issues while using the plugin, please register an issues on [GitHub](https://github.com/thorito/custom_activity_recognition/issues). 

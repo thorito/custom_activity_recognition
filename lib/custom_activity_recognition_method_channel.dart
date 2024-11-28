@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'custom_activity_recognition_platform_interface.dart';
 
+/// The MethodChannel that will the implementation of CustomActivityRecognition.
 class MethodChannelCustomActivityRecognition
     extends CustomActivityRecognitionPlatform {
   static const MethodChannel _methodChannel =
@@ -11,6 +12,7 @@ class MethodChannelCustomActivityRecognition
   static const EventChannel _eventChannel =
       EventChannel('com.aikotelematics.custom_activity_recognition/events');
 
+  /// Checks if activity recognition is available
   @override
   Future<bool> requestPermissions() async {
     try {
@@ -25,6 +27,7 @@ class MethodChannelCustomActivityRecognition
     }
   }
 
+  /// Starts tracking user activity
   @override
   Future<bool> startTracking() async {
     try {
@@ -38,6 +41,7 @@ class MethodChannelCustomActivityRecognition
     }
   }
 
+  /// Stops tracking user activity
   @override
   Future<bool> stopTracking() async {
     try {
@@ -51,6 +55,7 @@ class MethodChannelCustomActivityRecognition
     }
   }
 
+  /// Stream of activity data
   @override
   Stream<ActivityData> activityStream() =>
       _eventChannel.receiveBroadcastStream().map((event) {
@@ -72,6 +77,7 @@ class MethodChannelCustomActivityRecognition
         }
       });
 
+  /// Checks if activity recognition is available
   @override
   Future<bool> isActivityRecognitionAvailable() async {
     try {

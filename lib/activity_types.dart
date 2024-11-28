@@ -24,6 +24,7 @@ extension ActivityTypeExtension on ActivityType {
       };
 }
 
+/// Data class for activity data
 class ActivityData extends Equatable {
   final DateTime timestamp;
   final String activity;

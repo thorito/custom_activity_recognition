@@ -1,6 +1,6 @@
 name: custom_activity_recognition_example
 description: "Demonstrates how to use the custom_activity_recognition plugin."
-version: 0.0.4
+version: 0.0.5
 publish_to: 'none'
 
 environment:
