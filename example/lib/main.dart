@@ -24,6 +24,7 @@ class ActivityRecognitionApp extends StatefulWidget {
 
 class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
   final _activityRecognition = CustomActivityRecognition.instance;
+  StreamSubscription<ActivityData>? _subscription;
   ActivityData? _lastActivity;
   bool _isTracking = false;
 
@@ -31,6 +32,12 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
   void initState() {
     super.initState();
     _checkPermissionsAndAvailability();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -80,7 +87,7 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
       } else {
         final isGranted = await _activityRecognition.requestPermissions();
         if (isGranted) {
-          _setupActivityStream();
+          await _initActivityListener();
         }
       }
     } else {
@@ -88,8 +95,9 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
     }
   }
 
-  void _setupActivityStream() {
-    _activityRecognition.activityStream().listen(
+  Future<void> _initActivityListener() async {
+    _subscription?.cancel();
+    _subscription = _activityRecognition.activityStream().listen(
       (activity) {
         setState(() {
           _lastActivity = activity;
@@ -110,6 +118,9 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
         success = await _activityRecognition.stopTracking();
       } else {
         success = await _activityRecognition.startTracking();
+        if (success) {
+          await _initActivityListener();
+        }
       }
 
       if (success) {

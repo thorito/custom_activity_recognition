@@ -17,8 +17,9 @@ import java.util.Locale
 class ActivityRecognitionService : Service() {
 
     companion object {
-
         private var isServiceRunning = false
+        private const val ACTIVITY_REQUEST_CODE = 100
+        private const val TRANSITION_REQUEST_CODE = 200
         private const val TAG = "ActivityService"
         private const val NOTIFICATION_ID = 4321
         private const val CHANNEL_ID = "activity_recognition_channel"
@@ -26,9 +27,9 @@ class ActivityRecognitionService : Service() {
         fun isRunning() = isServiceRunning
     }
 
-    private val handler = Handler(Looper.getMainLooper())
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
-    private var pendingIntent: PendingIntent? = null
+    private var activityIntent: PendingIntent? = null
+    private var transitionIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
     private var timestamp: Long = 0
 
@@ -37,7 +38,7 @@ class ActivityRecognitionService : Service() {
         activityRecognitionClient = ActivityRecognition.getClient(this)
         createNotificationChannel()
         setupActivityRecognition()
-        handler.postDelayed(updateNotificationRunnable, 5000)
+        setupTransitionRecognition()
         isServiceRunning = true
     }
 
@@ -63,20 +64,16 @@ class ActivityRecognitionService : Service() {
                     updateNotification()
                 }
             }
-            else -> {
-                setupActivityRecognition()
-            }
         }
-
 
         return START_STICKY
     }
 
     private fun setupActivityRecognition() {
         val intent = Intent(this, ActivityRecognitionReceiver::class.java)
-        pendingIntent = PendingIntent.getBroadcast(
+        activityIntent = PendingIntent.getBroadcast(
             this,
-            0,
+            ACTIVITY_REQUEST_CODE,
             intent,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -85,6 +82,50 @@ class ActivityRecognitionService : Service() {
             }
         )
 
+        activityIntent?.let {
+            activityRecognitionClient.removeActivityUpdates(it)
+                .addOnCompleteListener {
+                    Log.d(TAG, "removeActivityUpdates success")
+                    initActivityUpdates()
+                }
+
+        }
+    }
+
+    private fun initActivityUpdates() {
+        activityRecognitionClient.requestActivityUpdates(15000, activityIntent!!)
+            .addOnSuccessListener {
+                Log.d(TAG, "requestActivityUpdates success")
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Error requestActivityUpdates: ${e.message}")
+            }
+    }
+
+    private fun setupTransitionRecognition() {
+        val intent = Intent(this, ActivityRecognitionReceiver::class.java)
+        transitionIntent = PendingIntent.getBroadcast(
+            this,
+            TRANSITION_REQUEST_CODE,
+            intent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+        )
+
+        transitionIntent?.let {
+            activityRecognitionClient.removeActivityTransitionUpdates(it)
+                .addOnCompleteListener {
+                    Log.d(TAG, "removeActivityTransitionUpdates success")
+                    initTransitionRequest()
+                }
+
+        }
+    }
+
+    private fun initTransitionRequest() {
         val transitions = mutableListOf<ActivityTransition>()
 
         val activityTypes = listOf(
@@ -106,12 +147,12 @@ class ActivityRecognitionService : Service() {
         }
 
         val request = ActivityTransitionRequest(transitions)
-        activityRecognitionClient.requestActivityTransitionUpdates(request, pendingIntent!!)
+        activityRecognitionClient.requestActivityTransitionUpdates(request, transitionIntent!!)
             .addOnSuccessListener {
                 Log.d(TAG, "requestActivityTransitionUpdates success")
             }
             .addOnFailureListener { e ->
-                Log.e(TAG, "Error al iniciar el registro de transiciones: ${e.message}")
+                Log.e(TAG, "Error requestActivityTransitionUpdates: ${e.message}")
             }
     }
 
@@ -168,22 +209,16 @@ class ActivityRecognitionService : Service() {
         notificationManager.notify(NOTIFICATION_ID, createNotification())
     }
 
-    private val updateNotificationRunnable = object : Runnable {
-        override fun run() {
-            startForeground(NOTIFICATION_ID, createNotification())
-            handler.postDelayed(this, 5000)
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacks(updateNotificationRunnable)
-        pendingIntent?.let { pending ->
+        activityIntent?.let { pending ->
+            activityRecognitionClient.removeActivityUpdates(pending)
+        }
+        transitionIntent?.let { pending ->
             activityRecognitionClient.removeActivityTransitionUpdates(pending)
-            //activityRecognitionClient.removeActivityUpdates(pending)
         }
         isServiceRunning = false
-        Log.d(TAG, "Servicio destruido")
+        Log.d(TAG, "Service destroyed")
     }
 
 }

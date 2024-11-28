@@ -2,6 +2,7 @@ package com.aikotelematics.custom_activity_recognition
 
 import android.Manifest
 import android.app.Activity
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -14,17 +15,16 @@ import io.flutter.plugin.common.EventChannel
 class ActivityRecognitionManager(private val context: Context) : EventChannel.StreamHandler {
     companion object {
         private const val PERMISSION_REQUEST_CODE = 100
+        private var eventSinkInstance: EventChannel.EventSink? = null
     }
 
-    private var eventSink: EventChannel.EventSink? = null
-
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
-        eventSink = events
+        eventSinkInstance = events
         ActivityRecognitionReceiver.eventSink = events
     }
 
     override fun onCancel(arguments: Any?) {
-        eventSink = null
+        eventSinkInstance = null
         ActivityRecognitionReceiver.eventSink = null
     }
 
@@ -49,7 +49,6 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
             }
         }
 
-
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(
                 activity,
@@ -67,6 +66,10 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         if (!hasRequiredPermissions()) {
             callback(false)
             return
+        }
+
+        eventSinkInstance?.let {
+            ActivityRecognitionReceiver.eventSink = it
         }
 
         if (SDK_INT >= VERSION_CODES.O) {

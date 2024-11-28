@@ -1,3 +1,8 @@
+## 0.0.7
+
+* Added hybrid model.
+* Fixed stream start in the example 
+
 ## 0.0.6
 
 * Updated documentation.

@@ -19,14 +19,27 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
 
         when {
-            ActivityTransitionResult.hasResult(intent) -> {
-                handleTransitionResult(context, ActivityTransitionResult.extractResult(intent))
-            }
             ActivityRecognitionResult.hasResult(intent) -> {
                 handleActivityResult(context, ActivityRecognitionResult.extractResult(intent))
             }
+            ActivityTransitionResult.hasResult(intent) -> {
+                handleTransitionResult(context, ActivityTransitionResult.extractResult(intent))
+            }
             else -> {
                 Log.d(TAG, "Intent recibido sin resultado reconocible")
+            }
+        }
+    }
+
+    private fun handleActivityResult(context: Context, result: ActivityRecognitionResult?) {
+        result?.let {
+            val activity = it.mostProbableActivity
+            val activityType = getActivityType(activity.type)
+            Log.d(TAG, "⭕️ Activity detected: $activityType, " +
+                    "confidence: ${activity.confidence}")
+            if (activity.confidence > 50) {
+                val timestamp = it.time
+                sendActivityUpdate(context, activityType, timestamp)
             }
         }
     }
@@ -38,18 +51,7 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
                 val currentTimeMillis = System.currentTimeMillis()
                 val bootTimeMillis = currentTimeMillis - SystemClock.elapsedRealtime()
                 val timestamp = bootTimeMillis + (event.elapsedRealTimeNanos / 1_000_000)
-
-                sendActivityUpdate(context, activityType, timestamp)
-            }
-        }
-    }
-
-    private fun handleActivityResult(context: Context, result: ActivityRecognitionResult?) {
-        result?.let {
-            val activity = it.mostProbableActivity
-            if (activity.confidence >= 50) {
-                val activityType = getActivityType(activity.type)
-                val timestamp = it.time
+                Log.d(TAG, "⭕️ Activity transition detected: $activityType")
                 sendActivityUpdate(context, activityType, timestamp)
             }
         }
@@ -70,10 +72,12 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
             putExtra("timestamp", timestamp)
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent)
-        } else {
-            context.startService(serviceIntent)
+        if (ActivityRecognitionService.isRunning()) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
         }
     }
 
