@@ -1,3 +1,7 @@
+## 0.0.8
+
+* Allow to enable or disable the hybrid model (only for Android).
+
 ## 0.0.7
 
 * Added hybrid model.

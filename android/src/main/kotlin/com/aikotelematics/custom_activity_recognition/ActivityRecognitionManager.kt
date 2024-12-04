@@ -61,7 +61,9 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         }
     }
 
-    fun startTracking(callback: (Boolean) -> Unit) {
+    fun startTracking(useTransitionRecognition: Boolean = true,
+                      useActivityRecognition: Boolean = false,
+                      callback: (Boolean) -> Unit) {
 
         if (!hasRequiredPermissions()) {
             callback(false)
@@ -72,10 +74,15 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
             ActivityRecognitionReceiver.eventSink = it
         }
 
+        val intent = Intent(context, ActivityRecognitionService::class.java).apply {
+            putExtra("useTransitionRecognition", useTransitionRecognition)
+            putExtra("useActivityRecognition", useActivityRecognition)
+        }
+
         if (SDK_INT >= VERSION_CODES.O) {
-            context.startForegroundService(Intent(context, ActivityRecognitionService::class.java))
+            context.startForegroundService(intent)
         } else {
-            context.startService(Intent(context, ActivityRecognitionService::class.java))
+            context.startService(intent)
         }
         callback(true)
     }

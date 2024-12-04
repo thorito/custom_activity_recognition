@@ -59,7 +59,12 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
         } ?: result.error("NO_ACTIVITY", "Activity is not available", null)
       }
       "startTracking" -> {
-        activityRecognitionManager.startTracking { success ->
+        val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: true
+        val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: false
+        activityRecognitionManager.startTracking(
+          useTransitionRecognition = useTransitionRecognition,
+          useActivityRecognition = useActivityRecognition) { success ->
+
           result.success(success)
         }
       }
@@ -99,7 +104,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
     try {
       activityRecognitionManager.stopTracking { _ -> }
     } catch (e: Exception) {
-      // Manejar cualquier error durante la limpieza
+      // Not used
     }
   }
 }

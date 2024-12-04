@@ -14,9 +14,8 @@ To use this plugin, add flutter_activity_recognition as a dependency in your pub
 For example:
 ```yaml
   dependencies:
-    custom_activity_recognition: ^0.0.7
+    custom_activity_recognition: ^0.0.8
 ```
-
 
 * Android
   Open the AndroidManifest.xml file and add the following permissions between the <manifest> and <application> tags.
@@ -27,6 +26,18 @@ For example:
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
+```
+
+Allow to enable or disable the hybrid model (only for Android).
+
+```dart
+  // CustomActivityRecognition.instance.startTracking() 
+  // useTransitionRecognition = true, useActivityRecognition = false
+
+  CustomActivityRecognition.instance.startTracking(
+    useTransitionRecognition: false,
+    useActivityRecognition: true,
+  );
 ```
 
 * iOS

@@ -29,9 +29,15 @@ class MethodChannelCustomActivityRecognition
 
   /// Starts tracking user activity
   @override
-  Future<bool> startTracking() async {
+  Future<bool> startTracking({
+    bool useTransitionRecognition = true,
+    bool useActivityRecognition = false,
+  }) async {
     try {
-      final bool? result = await _methodChannel.invokeMethod('startTracking');
+      final bool? result = await _methodChannel.invokeMethod('startTracking', {
+        'useTransitionRecognition': useTransitionRecognition,
+        'useActivityRecognition': useActivityRecognition,
+      });
       return result ?? false;
     } on PlatformException catch (e) {
       if (kDebugMode) {

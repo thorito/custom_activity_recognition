@@ -22,7 +22,17 @@ class CustomActivityRecognition {
       await _platform.requestPermissions();
 
   /// Starts tracking user activity
-  Future<bool> startTracking() async => await _platform.startTracking();
+  /// [useTransitionRecognition] and [useActivityRecognition] are optional
+  /// useTransitionRecognition is true by default
+  /// useActivityRecognition is false by default
+  Future<bool> startTracking({
+    bool useTransitionRecognition = true,
+    bool useActivityRecognition = false,
+  }) async =>
+      await _platform.startTracking(
+        useTransitionRecognition: useTransitionRecognition,
+        useActivityRecognition: useActivityRecognition,
+      );
 
   /// Stops tracking user activity
   Future<bool> stopTracking() async => await _platform.stopTracking();

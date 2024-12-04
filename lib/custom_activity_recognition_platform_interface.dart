@@ -27,7 +27,10 @@ abstract class CustomActivityRecognitionPlatform extends PlatformInterface {
   }
 
   /// Starts tracking user activity
-  Future<bool> startTracking() {
+  Future<bool> startTracking({
+    bool useTransitionRecognition = true,
+    bool useActivityRecognition = false,
+  }) {
     throw UnimplementedError('startTracking() has not been implemented.');
   }
 
