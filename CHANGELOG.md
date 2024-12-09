@@ -1,3 +1,7 @@
+## 0.0.9
+
+* Configure detectionIntervalMillis and confidenceThreshold for requestActivityUpdates (only for Android).
+
 ## 0.0.8
 
 * Allow to enable or disable the hybrid model (only for Android).

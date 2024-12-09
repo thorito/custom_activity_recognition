@@ -61,9 +61,14 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
       "startTracking" -> {
         val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: true
         val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: false
+        val detectionIntervalMillis = call.argument<Int>("detectionIntervalMillis") ?: 10000
+        val confidenceThreshold = call.argument<Int>("confidenceThreshold") ?: 50
+
         activityRecognitionManager.startTracking(
           useTransitionRecognition = useTransitionRecognition,
-          useActivityRecognition = useActivityRecognition) { success ->
+          useActivityRecognition = useActivityRecognition,
+          detectionIntervalMillis = detectionIntervalMillis,
+          confidenceThreshold = confidenceThreshold) { success ->
 
           result.success(success)
         }

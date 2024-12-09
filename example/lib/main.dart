@@ -117,7 +117,12 @@ class _ActivityRecognitionAppState extends State<ActivityRecognitionApp> {
       if (_isTracking) {
         success = await _activityRecognition.stopTracking();
       } else {
-        success = await _activityRecognition.startTracking();
+        success = await _activityRecognition.startTracking(
+          useTransitionRecognition: true,
+          useActivityRecognition: true,
+          detectionIntervalMillis: 10000,
+          confidenceThreshold: 50,
+        );
         if (success) {
           await _initActivityListener();
         }

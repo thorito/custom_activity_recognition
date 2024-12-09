@@ -26,12 +26,14 @@ class ActivityRecognitionService : Service() {
         private const val NOTIFICATION_ID = 4321
         private const val CHANNEL_ID = "activity_recognition_channel"
 
+        var confidenceThreshold: Int = 50
         fun isRunning() = isServiceRunning
     }
 
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private var useTransitionRecognition: Boolean = true
     private var useActivityRecognition: Boolean = false
+    private var detectionIntervalMillis: Int = 10000
     private var activityIntent: PendingIntent? = null
     private var transitionIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
@@ -58,6 +60,11 @@ class ActivityRecognitionService : Service() {
         if (!isActivityRecognitionConfigured) {
             useActivityRecognition =
                 intent?.getBooleanExtra("useActivityRecognition", false) ?: false
+            detectionIntervalMillis =
+                intent?.getIntExtra("detectionIntervalMillis", 10000) ?: 10000
+            confidenceThreshold = intent?.getIntExtra("confidenceThreshold", 50) ?: 50
+
+
             if (useActivityRecognition) {
                 setupActivityRecognition()
                 isActivityRecognitionConfigured = true
@@ -66,7 +73,9 @@ class ActivityRecognitionService : Service() {
 
         Log.d(TAG, "onStartCommand: ${intent?.action}, " +
                 "useTransitionRecognition: $useTransitionRecognition, " +
-                "useActivityRecognition: $useActivityRecognition")
+                "useActivityRecognition: $useActivityRecognition, " +
+                "detectionIntervalMillis: $detectionIntervalMillis, " +
+                "confidenceThreshold: $confidenceThreshold")
 
         when (intent?.action) {
             "UPDATE_ACTIVITY" -> {
@@ -239,7 +248,7 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun initActivityUpdates() {
-        activityRecognitionClient.requestActivityUpdates(15000, activityIntent!!)
+        activityRecognitionClient.requestActivityUpdates(detectionIntervalMillis.toLong(), activityIntent!!)
             .addOnSuccessListener {
                 Log.d(TAG, "requestActivityUpdates success")
             }

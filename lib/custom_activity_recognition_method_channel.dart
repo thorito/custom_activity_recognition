@@ -32,11 +32,15 @@ class MethodChannelCustomActivityRecognition
   Future<bool> startTracking({
     bool useTransitionRecognition = true,
     bool useActivityRecognition = false,
+    int detectionIntervalMillis = 10000,
+    int confidenceThreshold = 50,
   }) async {
     try {
       final bool? result = await _methodChannel.invokeMethod('startTracking', {
         'useTransitionRecognition': useTransitionRecognition,
         'useActivityRecognition': useActivityRecognition,
+        'detectionIntervalMillis': detectionIntervalMillis,
+        'confidenceThreshold': confidenceThreshold
       });
       return result ?? false;
     } on PlatformException catch (e) {

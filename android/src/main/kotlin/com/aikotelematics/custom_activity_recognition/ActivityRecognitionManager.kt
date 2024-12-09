@@ -10,6 +10,7 @@ import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.aikotelematics.custom_activity_recognition.ActivityRecognitionService.Companion
 import io.flutter.plugin.common.EventChannel
 
 class ActivityRecognitionManager(private val context: Context) : EventChannel.StreamHandler {
@@ -63,6 +64,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
 
     fun startTracking(useTransitionRecognition: Boolean = true,
                       useActivityRecognition: Boolean = false,
+                      detectionIntervalMillis: Int = 10000,
+                      confidenceThreshold: Int = 50,
                       callback: (Boolean) -> Unit) {
 
         if (!hasRequiredPermissions()) {
@@ -77,6 +80,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         val intent = Intent(context, ActivityRecognitionService::class.java).apply {
             putExtra("useTransitionRecognition", useTransitionRecognition)
             putExtra("useActivityRecognition", useActivityRecognition)
+            putExtra("detectionIntervalMillis", detectionIntervalMillis)
+            putExtra("confidenceThreshold", confidenceThreshold)
         }
 
         if (SDK_INT >= VERSION_CODES.O) {
