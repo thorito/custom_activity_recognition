@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:custom_activity_recognition/activity_types.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +18,11 @@ class MethodChannelCustomActivityRecognition
   @override
   Future<bool> requestPermissions() async {
     try {
+      final isAvailable = await isActivityRecognitionAvailable();
+      if (!isAvailable) {
+        return false;
+      }
+
       final bool? result =
           await _methodChannel.invokeMethod('requestPermissions');
       return result ?? false;
@@ -36,12 +43,17 @@ class MethodChannelCustomActivityRecognition
     int confidenceThreshold = 50,
   }) async {
     try {
-      final bool? result = await _methodChannel.invokeMethod('startTracking', {
-        'useTransitionRecognition': useTransitionRecognition,
-        'useActivityRecognition': useActivityRecognition,
-        'detectionIntervalMillis': detectionIntervalMillis,
-        'confidenceThreshold': confidenceThreshold
-      });
+      final Map<String, dynamic> arguments = Platform.isAndroid
+          ? {
+              'useTransitionRecognition': useTransitionRecognition,
+              'useActivityRecognition': useActivityRecognition,
+              'detectionIntervalMillis': detectionIntervalMillis,
+              'confidenceThreshold': confidenceThreshold
+            }
+          : {};
+
+      final bool? result =
+          await _methodChannel.invokeMethod('startTracking', arguments);
       return result ?? false;
     } on PlatformException catch (e) {
       if (kDebugMode) {
@@ -91,6 +103,10 @@ class MethodChannelCustomActivityRecognition
   @override
   Future<bool> isActivityRecognitionAvailable() async {
     try {
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        return false;
+      }
+
       final bool? result = await _methodChannel.invokeMethod('isAvailable');
       return result ?? false;
     } on PlatformException catch (e) {

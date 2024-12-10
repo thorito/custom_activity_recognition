@@ -11,15 +11,14 @@ class CustomActivityRecognition {
   /// The default instance of [CustomActivityRecognition] to use
   static CustomActivityRecognition get instance => _instance;
 
-  final _platform = CustomActivityRecognitionPlatform.instance;
-
   /// Checks if activity recognition is available
   Future<bool> isAvailable() async =>
-      await _platform.isActivityRecognitionAvailable();
+      await CustomActivityRecognitionPlatform.instance
+          .isActivityRecognitionAvailable();
 
   /// Requests permissions for activity recognition
   Future<bool> requestPermissions() async =>
-      await _platform.requestPermissions();
+      await CustomActivityRecognitionPlatform.instance.requestPermissions();
 
   /// Starts tracking user activity
   /// [useTransitionRecognition] and [useActivityRecognition] are optional
@@ -33,7 +32,7 @@ class CustomActivityRecognition {
     int detectionIntervalMillis = 10000,
     int confidenceThreshold = 50,
   }) async =>
-      await _platform.startTracking(
+      await CustomActivityRecognitionPlatform.instance.startTracking(
         useTransitionRecognition: useTransitionRecognition,
         useActivityRecognition: useActivityRecognition,
         detectionIntervalMillis: detectionIntervalMillis,
@@ -41,8 +40,10 @@ class CustomActivityRecognition {
       );
 
   /// Stops tracking user activity
-  Future<bool> stopTracking() async => await _platform.stopTracking();
+  Future<bool> stopTracking() async =>
+      await CustomActivityRecognitionPlatform.instance.stopTracking();
 
   /// Stream of activity data
-  Stream<ActivityData> activityStream() => _platform.activityStream();
+  Stream<ActivityData> activityStream() =>
+      CustomActivityRecognitionPlatform.instance.activityStream();
 }

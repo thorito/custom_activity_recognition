@@ -30,8 +30,12 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
     }
 
     fun isAvailable(): Boolean {
-        return context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER) &&
-                context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_DETECTOR)
+        return try {
+            context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER) &&
+                    context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_DETECTOR)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun requestPermissions(activity: Activity, callback: (Boolean) -> Unit) {

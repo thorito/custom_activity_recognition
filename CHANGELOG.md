@@ -1,3 +1,7 @@
+## 0.0.10
+
+* Fixed: Checking activity permissions.
+
 ## 0.0.9
 
 * Configure detectionIntervalMillis and confidenceThreshold for requestActivityUpdates (only for Android).
