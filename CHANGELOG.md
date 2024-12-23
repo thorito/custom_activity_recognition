@@ -1,3 +1,7 @@
+## 0.0.11
+
+* Parameter in Android to hide push notification (not recommended according to Google policies)
+
 ## 0.0.10
 
 * Fixed: Checking activity permissions.

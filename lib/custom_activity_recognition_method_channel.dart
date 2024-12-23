@@ -37,6 +37,7 @@ class MethodChannelCustomActivityRecognition
   /// Starts tracking user activity
   @override
   Future<bool> startTracking({
+    bool showNotification = true,
     bool useTransitionRecognition = true,
     bool useActivityRecognition = false,
     int detectionIntervalMillis = 10000,
@@ -45,6 +46,7 @@ class MethodChannelCustomActivityRecognition
     try {
       final Map<String, dynamic> arguments = Platform.isAndroid
           ? {
+              'showNotification': showNotification,
               'useTransitionRecognition': useTransitionRecognition,
               'useActivityRecognition': useActivityRecognition,
               'detectionIntervalMillis': detectionIntervalMillis,

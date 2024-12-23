@@ -66,7 +66,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         }
     }
 
-    fun startTracking(useTransitionRecognition: Boolean = true,
+    fun startTracking(showNotification: Boolean = true,
+                      useTransitionRecognition: Boolean = true,
                       useActivityRecognition: Boolean = false,
                       detectionIntervalMillis: Int = 10000,
                       confidenceThreshold: Int = 50,
@@ -82,6 +83,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         }
 
         val intent = Intent(context, ActivityRecognitionService::class.java).apply {
+            putExtra("showNotification", showNotification)
             putExtra("useTransitionRecognition", useTransitionRecognition)
             putExtra("useActivityRecognition", useActivityRecognition)
             putExtra("detectionIntervalMillis", detectionIntervalMillis)

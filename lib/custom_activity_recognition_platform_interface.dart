@@ -28,6 +28,7 @@ abstract class CustomActivityRecognitionPlatform extends PlatformInterface {
 
   /// Starts tracking user activity
   Future<bool> startTracking({
+    bool showNotification = true,
     bool useTransitionRecognition = true,
     bool useActivityRecognition = false,
     int detectionIntervalMillis = 10000,

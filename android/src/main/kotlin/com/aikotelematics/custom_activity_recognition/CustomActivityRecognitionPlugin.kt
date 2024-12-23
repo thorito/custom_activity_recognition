@@ -59,12 +59,14 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
         } ?: result.error("NO_ACTIVITY", "Activity is not available", null)
       }
       "startTracking" -> {
+        val showNotification = call.argument<Boolean>("showNotification") ?: true
         val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: true
         val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: false
         val detectionIntervalMillis = call.argument<Int>("detectionIntervalMillis") ?: 10000
         val confidenceThreshold = call.argument<Int>("confidenceThreshold") ?: 50
 
         activityRecognitionManager.startTracking(
+          showNotification = showNotification,
           useTransitionRecognition = useTransitionRecognition,
           useActivityRecognition = useActivityRecognition,
           detectionIntervalMillis = detectionIntervalMillis,

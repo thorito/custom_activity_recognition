@@ -14,7 +14,7 @@ To use this plugin, add flutter_activity_recognition as a dependency in your pub
 For example:
 ```yaml
   dependencies:
-    custom_activity_recognition: ^0.0.10
+    custom_activity_recognition: ^0.0.11
 ```
 
 * Android
@@ -35,6 +35,7 @@ Allow to enable or disable the hybrid model (only for Android).
   // useTransitionRecognition = true, useActivityRecognition = false
 
   CustomActivityRecognition.instance.startTracking(
+    showNotification: true,
     useTransitionRecognition: false,
     useActivityRecognition: true,
     detectionIntervalMillis: 10000,
@@ -51,7 +52,6 @@ Allow to enable or disable the hybrid model (only for Android).
     <key>UIBackgroundModes</key>
     <array>
         <string>fetch</string>
-        <string>motion</string>
     </array>
 ```
 
