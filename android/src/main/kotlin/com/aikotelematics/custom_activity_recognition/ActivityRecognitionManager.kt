@@ -17,6 +17,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
     companion object {
         private const val PERMISSION_REQUEST_CODE = 100
         private var eventSinkInstance: EventChannel.EventSink? = null
+        private var permissionCallback: ((Boolean) -> Unit)? = null
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
@@ -40,6 +41,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
 
     fun requestPermissions(activity: Activity, callback: (Boolean) -> Unit) {
 
+        permissionCallback = callback
         val permissionsToRequest = mutableListOf<String>()
 
         if (SDK_INT >= VERSION_CODES.Q) {
@@ -60,9 +62,16 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                 permissionsToRequest.toTypedArray(),
                 PERMISSION_REQUEST_CODE
             )
-            callback(false)
         } else {
             callback(true)
+        }
+    }
+
+    fun handlePermissionResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+            permissionCallback?.invoke(allGranted)
+            permissionCallback = null
         }
     }
 

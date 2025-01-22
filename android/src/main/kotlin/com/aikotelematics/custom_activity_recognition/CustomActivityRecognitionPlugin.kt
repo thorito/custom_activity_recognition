@@ -26,6 +26,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
   private var activity: Activity? = null
   private lateinit var activityRecognitionManager: ActivityRecognitionManager
   private var binaryMessenger: BinaryMessenger? = null
+  private var pendingResult: Result? = null
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     context = flutterPluginBinding.applicationContext
@@ -53,8 +54,10 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
     when (call.method) {
       "requestPermissions" -> {
         activity?.let {
+          pendingResult = result
           activityRecognitionManager.requestPermissions(it) { granted ->
-            result.success(granted)
+            pendingResult?.success(granted)
+            pendingResult = null
           }
         } ?: result.error("NO_ACTIVITY", "Activity is not available", null)
       }
@@ -93,6 +96,10 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
 
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
+    binding.addRequestPermissionsResultListener { requestCode, permissions, grantResults ->
+      activityRecognitionManager.handlePermissionResult(requestCode, permissions, grantResults)
+      true
+    }
   }
 
   override fun onDetachedFromActivityForConfigChanges() {
