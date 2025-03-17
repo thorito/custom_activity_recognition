@@ -13,6 +13,7 @@ import com.google.android.gms.location.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.content.pm.ServiceInfo
 
 class ActivityRecognitionService : Service() {
 
@@ -55,7 +56,18 @@ class ActivityRecognitionService : Service() {
             isNotificationChannelCreated = true
         }
 
-        startForeground(NOTIFICATION_ID, createNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting foreground service: ${e.message}")
+            if (!showNotification) {
+                removeForegroundNotification()
+            }
+        }
 
         if (!isTransitionRecognitionConfigured) {
             useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", true) ?: true
@@ -184,6 +196,7 @@ class ActivityRecognitionService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setContentIntent(pendingIntent)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
 
         if (!showNotification) {
             notification.setContentTitle("")
