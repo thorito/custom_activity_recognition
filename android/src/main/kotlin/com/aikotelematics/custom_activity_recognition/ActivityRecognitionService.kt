@@ -14,6 +14,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.content.pm.ServiceInfo
+import android.os.PowerManager
 
 class ActivityRecognitionService : Service() {
 
@@ -32,6 +33,7 @@ class ActivityRecognitionService : Service() {
         fun isRunning() = isServiceRunning
     }
 
+    private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private var showNotification: Boolean = true
     private var useTransitionRecognition: Boolean = true
@@ -41,11 +43,20 @@ class ActivityRecognitionService : Service() {
     private var transitionIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
     private var timestamp: Long = 0
+    private val handler = Handler(Looper.getMainLooper())
+    private val healthCheckRunnable = object : Runnable {
+        override fun run() {
+            scheduleServiceHealthCheck()
+            handler.postDelayed(this, 15 * 60 * 1000) // Check every 15 minutes
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         activityRecognitionClient = ActivityRecognition.getClient(this)
         isServiceRunning = true
+
+        handler.postDelayed(healthCheckRunnable, 5 * 60 * 1000) // Check every 5 minutes
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -65,13 +76,14 @@ class ActivityRecognitionService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error starting foreground service: ${e.message}")
             if (!showNotification) {
-                removeForegroundNotification()
+//                removeForegroundNotification()
             }
         }
 
         if (!isTransitionRecognitionConfigured) {
             useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", true) ?: true
             if (useTransitionRecognition) {
+                acquireWakeLock()
                 setupTransitionRecognition()
                 isTransitionRecognitionConfigured = true
             }
@@ -86,6 +98,7 @@ class ActivityRecognitionService : Service() {
 
 
             if (useActivityRecognition) {
+                acquireWakeLock()
                 setupActivityRecognition()
                 isActivityRecognitionConfigured = true
             }
@@ -125,6 +138,30 @@ class ActivityRecognitionService : Service() {
         return START_STICKY
     }
 
+    private fun scheduleServiceHealthCheck() {
+        if (!isServiceRunning) {
+            return
+        }
+
+        Log.d(TAG, "Performing service health check")
+
+        // Verificar estado de las configuraciones
+        if (useTransitionRecognition && !isTransitionRecognitionConfigured) {
+            Log.d(TAG, "Reinitializing transition recognition")
+            setupTransitionRecognition()
+        }
+
+        if (useActivityRecognition && !isActivityRecognitionConfigured) {
+            Log.d(TAG, "Reinitializing activity recognition")
+            setupActivityRecognition()
+        }
+
+        // Verificar que la notificación sea visible si debe serlo
+        if (showNotification) {
+            updateNotification()
+        }
+    }
+
     private fun removeForegroundNotification() {
         Handler(Looper.getMainLooper()).postDelayed({
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -137,17 +174,28 @@ class ActivityRecognitionService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+
+        handler.removeCallbacks(healthCheckRunnable)
+
+        releaseWakeLock()
+
         activityIntent?.let { pending ->
             activityRecognitionClient.removeActivityUpdates(pending)
+                .addOnCompleteListener {
+                    Log.d(TAG, "Activity updates removed")
+                }
         }
         transitionIntent?.let { pending ->
             activityRecognitionClient.removeActivityTransitionUpdates(pending)
+                .addOnCompleteListener {
+                    Log.d(TAG, "Transition updates removed")
+                }
         }
         isServiceRunning = false
         isActivityRecognitionConfigured = false
         isTransitionRecognitionConfigured = false
         Log.d(TAG, "Service destroyed")
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -267,9 +315,11 @@ class ActivityRecognitionService : Service() {
         activityRecognitionClient.requestActivityTransitionUpdates(request, transitionIntent!!)
             .addOnSuccessListener {
                 Log.d(TAG, "requestActivityTransitionUpdates success")
+                releaseWakeLock()
             }
             .addOnFailureListener { e ->
                 Log.e(TAG, "Error requestActivityTransitionUpdates: ${e.message}")
+                releaseWakeLock()
             }
     }
 
@@ -301,10 +351,39 @@ class ActivityRecognitionService : Service() {
         activityRecognitionClient.requestActivityUpdates(detectionIntervalMillis.toLong(), activityIntent!!)
             .addOnSuccessListener {
                 Log.d(TAG, "requestActivityUpdates success")
+                releaseWakeLock()
             }
             .addOnFailureListener { e ->
                 Log.e(TAG, "Error requestActivityUpdates: ${e.message}")
+                releaseWakeLock()
             }
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock == null) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "ActivityRecognition:WakeLock"
+            )
+            wakeLock?.setReferenceCounted(false)
+        }
+
+        if (wakeLock?.isHeld == false) {
+            wakeLock?.acquire(3 * 60 * 1000L) // 3 minutes
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing WakeLock: ${e.message}")
+        }
     }
 
 }

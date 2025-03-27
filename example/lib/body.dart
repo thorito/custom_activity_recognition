@@ -114,7 +114,7 @@ class _BodyState extends State<Body> {
         success = await _activityRecognition.startTracking(
           showNotification: true,
           useTransitionRecognition: true,
-          useActivityRecognition: false,
+          useActivityRecognition: true,
           detectionIntervalMillis: 10000,
           confidenceThreshold: 50,
         );

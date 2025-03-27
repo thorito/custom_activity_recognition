@@ -29,7 +29,7 @@ class CustomActivityRecognition {
   Future<bool> startTracking({
     bool showNotification = true,
     bool useTransitionRecognition = true,
-    bool useActivityRecognition = false,
+    bool useActivityRecognition = true,
     int detectionIntervalMillis = 10000,
     int confidenceThreshold = 50,
   }) async =>

@@ -8,6 +8,13 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
   private var methodChannel: FlutterMethodChannel?
   private let streamHandler = ActivityStreamHandler()
 
+  private var isRunningOnSimulator: Bool {
+    #if targetEnvironment(simulator)
+      return true
+    #else
+      return false
+    #endif
+  }
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let instance = CustomActivityRecognitionPlugin()
@@ -44,6 +51,13 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
   }
 
   private func requestPermissions(result: @escaping FlutterResult) {
+
+      if isRunningOnSimulator {
+        print("Running in simulator: simulating granted permissions")
+        result(true)
+        return
+      }
+
       guard CMMotionActivityManager.isActivityAvailable() else {
           result(false)
           return
@@ -90,6 +104,12 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 }
 
   private func startTracking(result: @escaping FlutterResult) {
+
+      if isRunningOnSimulator {
+        result(true)
+        return
+      }
+
       guard CMMotionActivityManager.isActivityAvailable() else {
           result(false)
           return
@@ -121,11 +141,22 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
   }
 
   private func stopTracking(result: @escaping FlutterResult) {
+      if isRunningOnSimulator {
+        result(true)
+        return
+      }
+
       streamHandler.stopTracking(activityManager: activityManager)
       result(true)
   }
 
   private func isActivityRecognitionAvailable(result: @escaping FlutterResult) {
+      if isRunningOnSimulator {
+        print("Running in simulator: reporting availability as true")
+        result(true)
+        return
+      }
+
       result(CMMotionActivityManager.isActivityAvailable())
   }
 }
