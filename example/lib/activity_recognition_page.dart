@@ -180,22 +180,27 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
         _isRequestingPermissions = true;
       });
 
-      final granted = await _activityRecognition.requestPermissions();
-      debugPrint('requestPermissions: $granted');
+      CustomActivityPermissionStatus status =
+          await _activityRecognition.checkPermissionStatus();
 
-      final status = await _activityRecognition.checkPermissionStatus();
+      if (status.isRestricted || status.isPermanentlyDenied) {
+        _showOpenSettingsDialog();
+      } else {
+        final isGranted = await _activityRecognition.requestPermissions();
+        debugPrint('Permission granted: $isGranted');
 
-      if (mounted) {
-        setState(() {
-          _permissionStatus = status;
-          _isRequestingPermissions = false;
-        });
+        status = await _activityRecognition.checkPermissionStatus();
+
+        if (mounted) {
+          setState(() {
+            _permissionStatus = status;
+            _isRequestingPermissions = false;
+          });
+        }
       }
 
       if (status.isGranted) {
         _setupActivityStream();
-      } else if (status.isPermanentlyDenied) {
-        _showOpenSettingsDialog();
       }
     } catch (e) {
       debugPrint('Error requesting permissions: $e');
@@ -210,6 +215,12 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequestingPermissions = false;
+        });
       }
     }
   }

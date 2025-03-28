@@ -46,11 +46,6 @@ class MethodChannelCustomActivityRecognition
   @override
   Future<bool> requestPermissions() async {
     try {
-      final isAvailable = await isActivityRecognitionAvailable();
-      if (!isAvailable) {
-        return false;
-      }
-
       final bool? result =
           await _methodChannel.invokeMethod('requestPermissions');
       return result ?? false;

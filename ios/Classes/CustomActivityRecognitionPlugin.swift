@@ -54,8 +54,7 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 
   private func checkPermissionStatus(result: @escaping FlutterResult) {
     guard isRunningOnSimulator || CMMotionActivityManager.isActivityAvailable() else {
-        print("Cannot proceed: Not running on simulator and CMMotionActivityManager is not available")
-        result("RESTRICTED")
+        result(false)
         return
     }
 
@@ -66,7 +65,7 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
         case .authorized:
             result("AUTHORIZED")
         case .denied:
-            result("DENIED")
+            result("PERMANENTLY_DENIED")
         case .restricted:
             result("RESTRICTED")
         case .notDetermined:
@@ -95,58 +94,52 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
   }
 
   private func requestPermissions(result: @escaping FlutterResult) {
-
       guard isRunningOnSimulator || CMMotionActivityManager.isActivityAvailable() else {
-          print("Cannot proceed: Not running on simulator and CMMotionActivityManager is not available")
-          result("RESTRICTED")
+          result(false)
           return
       }
 
       if #available(iOS 11.0, *) {
-         let status = CMMotionActivityManager.authorizationStatus()
+          let status = CMMotionActivityManager.authorizationStatus()
 
-         switch status {
-             case .authorized:
-                 result(true)
-             case .denied, .restricted:
-                 result(false)
-             case .notDetermined:
+          switch status {
+          case .authorized:
+              result(true)
+          case .denied, .restricted:
+              result(false)
+          case .notDetermined:
+              let endDate = Date()
+              let startDate = endDate.addingTimeInterval(-1000)
 
-                 let endDate = Date()
-                 let startDate = endDate.addingTimeInterval(-1000)
-
-                 activityManager.queryActivityStarting(from: startDate, to: endDate, to: OperationQueue.main) { [weak self] (activities, error) in
-                     DispatchQueue.main.async {
-                         if let error = error as NSError? {
-
-                             if error.domain == CMErrorDomain && error.code == 105 {
-                                 result(false)
-                             } else {
-                                 print("Error requesting permissions: \(error.localizedDescription)")
-                                 result(false)
-                             }
-                         } else {
-                             if CMMotionActivityManager.authorizationStatus() == .authorized {
-                                 result(true)
-                             } else {
-                                 result(false)
-                             }
-                         }
-                     }
-                 }
-             @unknown default:
-                 result(false)
-             }
-         } else {
-             result(false)
-         }
-}
+              activityManager.queryActivityStarting(from: startDate, to: endDate, to: OperationQueue.main) { (activities, error) in
+                  DispatchQueue.main.async {
+                      if let error = error as NSError? {
+                          if error.domain == CMErrorDomain && error.code == 105 {
+                              result(false)
+                          } else {
+                              result(false)
+                          }
+                      } else {
+                          if CMMotionActivityManager.authorizationStatus() == .authorized {
+                              result(true)
+                          } else {
+                              result(false)
+                          }
+                      }
+                  }
+              }
+          @unknown default:
+              result(false)
+          }
+      } else {
+          result(false)
+      }
+  }
 
   private func startTracking(result: @escaping FlutterResult) {
 
       guard isRunningOnSimulator || CMMotionActivityManager.isActivityAvailable() else {
-          print("Cannot proceed: Not running on simulator and CMMotionActivityManager is not available")
-          result("RESTRICTED")
+          result(false)
           return
       }
 
@@ -187,7 +180,6 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 
   private func isActivityRecognitionAvailable(result: @escaping FlutterResult) {
       if isRunningOnSimulator {
-        print("Running in simulator: reporting availability as true")
         result(true)
         return
       }
