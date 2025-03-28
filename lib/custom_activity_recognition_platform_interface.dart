@@ -1,4 +1,5 @@
 import 'package:custom_activity_recognition/activity_types.dart';
+import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'custom_activity_recognition_method_channel.dart';
@@ -19,6 +20,12 @@ abstract class CustomActivityRecognitionPlatform extends PlatformInterface {
   static set instance(CustomActivityRecognitionPlatform instance) {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
+  }
+
+  /// Checks the current status of activity recognition permission
+  Future<CustomActivityPermissionStatus> checkPermissionStatus() {
+    throw UnimplementedError(
+        'checkPermissionStatus() has not been implemented.');
   }
 
   /// Requests permissions for activity recognition

@@ -1,3 +1,5 @@
+import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
+
 import 'activity_types.dart';
 import 'custom_activity_recognition_platform_interface.dart';
 
@@ -15,6 +17,10 @@ class CustomActivityRecognition {
   Future<bool> isAvailable() async =>
       await CustomActivityRecognitionPlatform.instance
           .isActivityRecognitionAvailable();
+
+  /// Checks the current status of activity recognition permission
+  Future<CustomActivityPermissionStatus> checkPermissionStatus() async =>
+      await CustomActivityRecognitionPlatform.instance.checkPermissionStatus();
 
   /// Requests permissions for activity recognition
   Future<bool> requestPermissions() async =>

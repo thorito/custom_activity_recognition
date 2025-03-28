@@ -191,6 +191,10 @@ class ActivityRecognitionService : Service() {
                     Log.d(TAG, "Transition updates removed")
                 }
         }
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(NOTIFICATION_ID)
+
         isServiceRunning = false
         isActivityRecognitionConfigured = false
         isTransitionRecognitionConfigured = false

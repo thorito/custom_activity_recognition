@@ -37,6 +37,8 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
       switch call.method {
+      case "checkPermissionStatus":
+          checkPermissionStatus(result: result)
       case "requestPermissions":
           requestPermissions(result: result)
       case "startTracking":
@@ -48,6 +50,53 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
       default:
           result(FlutterMethodNotImplemented)
       }
+  }
+
+  private func checkPermissionStatus(result: @escaping FlutterResult) {
+    if isRunningOnSimulator {
+        print("Running in simulator: simulating authorized permission status")
+        result("AUTHORIZED")
+        return
+    }
+
+    guard CMMotionActivityManager.isActivityAvailable() else {
+        result("RESTRICTED")
+        return
+    }
+
+    if #available(iOS 11.0, *) {
+        let status = CMMotionActivityManager.authorizationStatus()
+
+        switch status {
+        case .authorized:
+            result("AUTHORIZED")
+        case .denied:
+            result("DENIED")
+        case .restricted:
+            result("RESTRICTED")
+        case .notDetermined:
+            result("NOT_DETERMINED")
+        @unknown default:
+            result("NOT_DETERMINED")
+        }
+    } else {
+        let endDate = Date()
+        let startDate = endDate.addingTimeInterval(-1000)
+
+        activityManager.queryActivityStarting(from: startDate, to: endDate, to: OperationQueue.main) { [weak self] (activities, error) in
+            DispatchQueue.main.async {
+                if let error = error as NSError? {
+                    if error.domain == CMErrorDomain && error.code == 105 {
+                        result("DENIED")
+                    } else {
+                        result("RESTRICTED")
+                    }
+                } else {
+                    result("AUTHORIZED")
+                }
+            }
+        }
+    }
   }
 
   private func requestPermissions(result: @escaping FlutterResult) {

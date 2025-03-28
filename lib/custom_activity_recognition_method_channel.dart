@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:custom_activity_recognition/activity_types.dart';
+import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -13,6 +14,33 @@ class MethodChannelCustomActivityRecognition
       MethodChannel('com.aikotelematics.custom_activity_recognition/methods');
   static const EventChannel _eventChannel =
       EventChannel('com.aikotelematics.custom_activity_recognition/events');
+
+  /// Checks the current status of activity recognition permission
+  @override
+  Future<CustomActivityPermissionStatus> checkPermissionStatus() async {
+    try {
+      final String? result =
+          await _methodChannel.invokeMethod('checkPermissionStatus');
+      switch (result) {
+        case 'AUTHORIZED':
+          return CustomActivityPermissionStatus.authorized;
+        case 'DENIED':
+          return CustomActivityPermissionStatus.denied;
+        case 'RESTRICTED':
+          return CustomActivityPermissionStatus.restricted;
+        case 'PERMANENTLY_DENIED':
+          return CustomActivityPermissionStatus.permanentlyDenied;
+        case 'NOT_DETERMINED':
+        default:
+          return CustomActivityPermissionStatus.notDetermined;
+      }
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print('Error checking permission status: ${e.message}');
+      }
+      return CustomActivityPermissionStatus.notDetermined;
+    }
+  }
 
   /// Checks if activity recognition is available
   @override
@@ -39,7 +67,7 @@ class MethodChannelCustomActivityRecognition
   Future<bool> startTracking({
     bool showNotification = true,
     bool useTransitionRecognition = true,
-    bool useActivityRecognition = false,
+    bool useActivityRecognition = true,
     int detectionIntervalMillis = 10000,
     int confidenceThreshold = 50,
   }) async {
