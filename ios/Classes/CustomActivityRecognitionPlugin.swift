@@ -53,13 +53,8 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
   }
 
   private func checkPermissionStatus(result: @escaping FlutterResult) {
-    if isRunningOnSimulator {
-        print("Running in simulator: simulating authorized permission status")
-        result("AUTHORIZED")
-        return
-    }
-
-    guard CMMotionActivityManager.isActivityAvailable() else {
+    guard isRunningOnSimulator || CMMotionActivityManager.isActivityAvailable() else {
+        print("Cannot proceed: Not running on simulator and CMMotionActivityManager is not available")
         result("RESTRICTED")
         return
     }
@@ -101,14 +96,9 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 
   private func requestPermissions(result: @escaping FlutterResult) {
 
-      if isRunningOnSimulator {
-        print("Running in simulator: simulating granted permissions")
-        result(true)
-        return
-      }
-
-      guard CMMotionActivityManager.isActivityAvailable() else {
-          result(false)
+      guard isRunningOnSimulator || CMMotionActivityManager.isActivityAvailable() else {
+          print("Cannot proceed: Not running on simulator and CMMotionActivityManager is not available")
+          result("RESTRICTED")
           return
       }
 
@@ -154,13 +144,9 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 
   private func startTracking(result: @escaping FlutterResult) {
 
-      if isRunningOnSimulator {
-        result(true)
-        return
-      }
-
-      guard CMMotionActivityManager.isActivityAvailable() else {
-          result(false)
+      guard isRunningOnSimulator || CMMotionActivityManager.isActivityAvailable() else {
+          print("Cannot proceed: Not running on simulator and CMMotionActivityManager is not available")
+          result("RESTRICTED")
           return
       }
 
