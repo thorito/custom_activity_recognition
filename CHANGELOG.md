@@ -1,3 +1,10 @@
+## 0.0.12
+
+* Silent notification on android.
+* Fixed update notification on android.
+* Fixed request permissions.
+* Refactor example.
+
 ## 0.0.11
 
 * Parameter in Android to hide push notification (not recommended according to Google policies)

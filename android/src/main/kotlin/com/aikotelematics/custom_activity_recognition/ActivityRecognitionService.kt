@@ -15,12 +15,12 @@ import java.util.Date
 import java.util.Locale
 import android.content.pm.ServiceInfo
 import android.os.PowerManager
+import android.graphics.Color
 
 class ActivityRecognitionService : Service() {
 
     companion object {
         private var isServiceRunning = false
-        private var isNotificationChannelCreated = false
         private var isActivityRecognitionConfigured = false
         private var isTransitionRecognitionConfigured = false
         private const val ACTIVITY_REQUEST_CODE = 100
@@ -28,6 +28,7 @@ class ActivityRecognitionService : Service() {
         private const val TAG = "ActivityService"
         private const val NOTIFICATION_ID = 4321
         private const val CHANNEL_ID = "activity_recognition_channel"
+        private const val SILENT_CHANNEL_ID = "activity_recognition_silent_channel"
 
         var confidenceThreshold: Int = 50
         fun isRunning() = isServiceRunning
@@ -56,17 +57,7 @@ class ActivityRecognitionService : Service() {
         activityRecognitionClient = ActivityRecognition.getClient(this)
         isServiceRunning = true
 
-        handler.postDelayed(healthCheckRunnable, 5 * 60 * 1000) // Check every 5 minutes
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-
-        if (!isNotificationChannelCreated) {
-            showNotification = intent?.getBooleanExtra("showNotification", true) ?: true
-            createNotificationChannel()
-            isNotificationChannelCreated = true
-        }
-
+        createNotificationChannel()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
@@ -75,13 +66,17 @@ class ActivityRecognitionService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error starting foreground service: ${e.message}")
-            if (!showNotification) {
-//                removeForegroundNotification()
-            }
         }
 
+        handler.postDelayed(healthCheckRunnable, 5 * 60 * 1000) // Check every 5 minutes
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+
+        showNotification = intent?.getBooleanExtra("showNotification", true) ?: true
+
         if (!isTransitionRecognitionConfigured) {
-            useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", true) ?: true
+            useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", false) ?: false
             if (useTransitionRecognition) {
                 acquireWakeLock()
                 setupTransitionRecognition()
@@ -91,9 +86,9 @@ class ActivityRecognitionService : Service() {
 
         if (!isActivityRecognitionConfigured) {
             useActivityRecognition =
-                intent?.getBooleanExtra("useActivityRecognition", false) ?: false
+                intent?.getBooleanExtra("useActivityRecognition", true) ?: true
             detectionIntervalMillis =
-                intent?.getIntExtra("detectionIntervalMillis", 10000) ?: 10000
+                intent?.getIntExtra("detectionIntervalMillis", 0) ?: 0
             confidenceThreshold = intent?.getIntExtra("confidenceThreshold", 50) ?: 50
 
 
@@ -125,15 +120,13 @@ class ActivityRecognitionService : Service() {
                     currentActivity = activityExtra
                 }
 
-                if (changes && showNotification) {
+                if (changes) {
                     updateNotification()
                 }
             }
         }
 
-        if (!showNotification) {
-            removeForegroundNotification()
-        }
+        updateNotification()
 
         return START_STICKY
     }
@@ -156,27 +149,12 @@ class ActivityRecognitionService : Service() {
             setupActivityRecognition()
         }
 
-        // Verificar que la notificación sea visible si debe serlo
-        if (showNotification) {
-            updateNotification()
-        }
-    }
-
-    private fun removeForegroundNotification() {
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
-        }, 1000)
+        updateNotification()
     }
 
     override fun onDestroy() {
 
         handler.removeCallbacks(healthCheckRunnable)
-
         releaseWakeLock()
 
         activityIntent?.let { pending ->
@@ -206,20 +184,30 @@ class ActivityRecognitionService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Activity Recognition"
-            val channel = if (showNotification) {
-                val descriptionText = "Tracking user activity"
-                NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_LOW).apply {
-                    description = descriptionText
-                }
-            } else {
-                NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_MIN).apply {
-                    setShowBadge(false)
-                }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            val normalChannel = NotificationChannel(
+                CHANNEL_ID,
+                "Activity Recognition",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Tracking user activity"
             }
 
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            val silentChannel = NotificationChannel(
+                SILENT_CHANNEL_ID,
+                "Silent Activity Recognition",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "Silent tracking"
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
+            }
+
+            notificationManager.createNotificationChannel(normalChannel)
+            notificationManager.createNotificationChannel(silentChannel)
         }
     }
 
@@ -239,25 +227,36 @@ class ActivityRecognitionService : Service() {
             }
         )
 
-        val timestampFormatted = if (timestamp > 0) { " (${formatTimestamp(timestamp)})" } else { "" }
+        val channelId = if (showNotification) CHANNEL_ID else SILENT_CHANNEL_ID
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Activity Recognition")
-            .setContentText("$currentActivity$timestampFormatted")
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+        val timestampFormatted = if (timestamp > 0 && showNotification) {
+            " (${formatTimestamp(timestamp)})"
+        } else {
+            ""
+        }
+
+        val builder = NotificationCompat.Builder(this, channelId)
             .setContentIntent(pendingIntent)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
 
-        if (!showNotification) {
-            notification.setContentTitle("")
-            notification.setContentText("")
-            notification.setPriority(NotificationCompat.PRIORITY_MIN)
-            notification.setVisibility(NotificationCompat.VISIBILITY_SECRET)
+        if (showNotification) {
+            builder.setContentTitle("Activity Recognition")
+                .setContentText("$currentActivity$timestampFormatted")
+                .setSmallIcon(android.R.drawable.ic_menu_compass)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+        } else {
+            builder.setContentTitle("")
+                .setContentText("")
+                .setSmallIcon(android.R.drawable.ic_menu_compass)
+                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                .setColor(Color.TRANSPARENT)
+                .setOngoing(true)
+                .setSilent(true)
         }
 
-        return notification.build()
+        return builder.build()
     }
 
     private fun formatTimestamp(timestamp: Long): String {
