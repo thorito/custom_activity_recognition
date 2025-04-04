@@ -60,7 +60,11 @@ class ActivityRecognitionService : Service() {
         createNotificationChannel()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
             } else {
                 startForeground(NOTIFICATION_ID, createNotification())
             }

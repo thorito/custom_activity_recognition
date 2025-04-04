@@ -1,3 +1,7 @@
+## 0.0.15
+
+* Added permission FOREGROUND_SERVICE_HEALTH
+
 ## 0.0.14
 
 * Updated readme.
