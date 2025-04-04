@@ -9,12 +9,15 @@ Activity recognition plugin for Android (**Activity Recognition Transition API**
 ## Getting started
 
 To use this plugin, add flutter_activity_recognition as a dependency in your pubspec.yaml file. 
-[Show video](https://youtube.com/shorts/vkVThDpTyk8?feature=share)
+
+## Demo
+
+[![Demo](https://youtube.com/shorts/ue3rZyVhpw0)
 
 For example:
 ```yaml
   dependencies:
-    custom_activity_recognition: ^0.0.11
+    custom_activity_recognition: ^0.0.13
 ```
 
 * Android
@@ -22,10 +25,15 @@ For example:
 
 ```
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 ```
 
 Allow to enable or disable the hybrid model (only for Android).

@@ -1,13 +1,13 @@
 name: custom_activity_recognition_example
 description: "Demonstrates how to use the custom_activity_recognition plugin."
-version: 0.0.12
+version: 0.0.13
 publish_to: 'none'
 
 environment:
   sdk: ^3.5.4
 
 dependencies:
-  app_settings: ^5.2.0
+  app_settings: ^6.1.1
   flutter:
     sdk: flutter
 

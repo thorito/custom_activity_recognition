@@ -1,3 +1,8 @@
+## 0.0.13
+
+* Fixed request permissions.
+* Updated example and video.
+
 ## 0.0.12
 
 * Silent notification on android.
