@@ -9,4 +9,4 @@ Demonstrates how to use the custom_activity_recognition plugin.
 
 ## Demo
 
-[![Demo](https://youtube.com/shorts/ue3rZyVhpw0)
+[Show video](https://youtube.com/shorts/ue3rZyVhpw0)

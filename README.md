@@ -12,7 +12,7 @@ To use this plugin, add flutter_activity_recognition as a dependency in your pub
 
 ## Demo
 
-[![Demo](https://youtube.com/shorts/ue3rZyVhpw0)
+[Show video](https://youtube.com/shorts/ue3rZyVhpw0)
 
 For example:
 ```yaml
@@ -46,7 +46,7 @@ Allow to enable or disable the hybrid model (only for Android).
     showNotification: true,
     useTransitionRecognition: false,
     useActivityRecognition: true,
-    detectionIntervalMillis: 10000,
+    detectionIntervalMillis: 0,
     confidenceThreshold: 50,
   );
 ```
