@@ -249,8 +249,8 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
     final success = await _activityRecognition.startTracking(
       showNotification: true,
       useTransitionRecognition: true,
-      useActivityRecognition: false,
-      detectionIntervalMillis: 0,
+      useActivityRecognition: true,
+      detectionIntervalMillis: 10000,
       confidenceThreshold: 50,
     );
 

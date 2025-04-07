@@ -29,7 +29,7 @@ class CustomActivityRecognition {
   /// Starts tracking user activity
   /// [useTransitionRecognition] and [useActivityRecognition] are optional
   /// useTransitionRecognition is true by default
-  /// useActivityRecognition is false by default
+  /// useActivityRecognition is true by default
   /// detectionIntervalMillis is 10000 by default
   /// confidenceThreshold is 50 by default
   Future<bool> startTracking({

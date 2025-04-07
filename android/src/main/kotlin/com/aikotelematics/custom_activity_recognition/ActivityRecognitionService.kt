@@ -20,9 +20,12 @@ import android.graphics.Color
 class ActivityRecognitionService : Service() {
 
     companion object {
+        private const val HAS_HEALTH_CHECK = true
+        private const val HEALTH_CHECK_INTERVAL: Long =  60 * 60 * 1000 // 1 hour
+
         private var isServiceRunning = false
-        private var isActivityRecognitionConfigured = false
         private var isTransitionRecognitionConfigured = false
+        private var isActivityRecognitionConfigured = false
         private const val ACTIVITY_REQUEST_CODE = 100
         private const val TRANSITION_REQUEST_CODE = 200
         private const val TAG = "ActivityService"
@@ -30,6 +33,7 @@ class ActivityRecognitionService : Service() {
         private const val CHANNEL_ID = "activity_recognition_channel"
         private const val SILENT_CHANNEL_ID = "activity_recognition_silent_channel"
 
+        var detectionIntervalMillis: Int = 10000
         var confidenceThreshold: Int = 50
         fun isRunning() = isServiceRunning
     }
@@ -38,8 +42,7 @@ class ActivityRecognitionService : Service() {
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private var showNotification: Boolean = true
     private var useTransitionRecognition: Boolean = true
-    private var useActivityRecognition: Boolean = false
-    private var detectionIntervalMillis: Int = 10000
+    private var useActivityRecognition: Boolean = true
     private var activityIntent: PendingIntent? = null
     private var transitionIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
@@ -47,8 +50,17 @@ class ActivityRecognitionService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val healthCheckRunnable = object : Runnable {
         override fun run() {
+            Log.d(TAG, "Health check")
+            if (!HAS_HEALTH_CHECK) {
+                return
+            }
+
+            if (!isServiceRunning) {
+                Log.d(TAG, "Service is not running, skipping health check")
+                return
+            }
             scheduleServiceHealthCheck()
-            handler.postDelayed(this, 15 * 60 * 1000) // Check every 15 minutes
+            handler.postDelayed(this, HEALTH_CHECK_INTERVAL)
         }
     }
 
@@ -72,35 +84,30 @@ class ActivityRecognitionService : Service() {
             Log.e(TAG, "Error starting foreground service: ${e.message}")
         }
 
-        handler.postDelayed(healthCheckRunnable, 5 * 60 * 1000) // Check every 5 minutes
+        if (HAS_HEALTH_CHECK) {
+            handler.postDelayed(healthCheckRunnable, HEALTH_CHECK_INTERVAL)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
         showNotification = intent?.getBooleanExtra("showNotification", true) ?: true
 
-        if (!isTransitionRecognitionConfigured) {
-            useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", false) ?: false
-            if (useTransitionRecognition) {
-                acquireWakeLock()
-                setupTransitionRecognition()
-                isTransitionRecognitionConfigured = true
-            }
+        useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", true) ?: true
+        useActivityRecognition = intent?.getBooleanExtra("useActivityRecognition", true) ?: true
+        detectionIntervalMillis = intent?.getIntExtra("detectionIntervalMillis", detectionIntervalMillis) ?: detectionIntervalMillis
+        confidenceThreshold = intent?.getIntExtra("confidenceThreshold", confidenceThreshold) ?: confidenceThreshold
+
+        if (!isTransitionRecognitionConfigured && useTransitionRecognition) {
+            acquireWakeLock()
+            setupTransitionRecognition()
+            isTransitionRecognitionConfigured = true
         }
 
-        if (!isActivityRecognitionConfigured) {
-            useActivityRecognition =
-                intent?.getBooleanExtra("useActivityRecognition", true) ?: true
-            detectionIntervalMillis =
-                intent?.getIntExtra("detectionIntervalMillis", 0) ?: 0
-            confidenceThreshold = intent?.getIntExtra("confidenceThreshold", 50) ?: 50
-
-
-            if (useActivityRecognition) {
-                acquireWakeLock()
-                setupActivityRecognition()
-                isActivityRecognitionConfigured = true
-            }
+        if (!isActivityRecognitionConfigured && useActivityRecognition) {
+            acquireWakeLock()
+            setupActivityRecognition()
+            isActivityRecognitionConfigured = true
         }
 
         Log.d(TAG, "onStartCommand: ${intent?.action}, " +
@@ -135,31 +142,11 @@ class ActivityRecognitionService : Service() {
         return START_STICKY
     }
 
-    private fun scheduleServiceHealthCheck() {
-        if (!isServiceRunning) {
-            return
-        }
-
-        Log.d(TAG, "Performing service health check")
-
-        // Verificar estado de las configuraciones
-        if (useTransitionRecognition && !isTransitionRecognitionConfigured) {
-            Log.d(TAG, "Reinitializing transition recognition")
-            setupTransitionRecognition()
-        }
-
-        if (useActivityRecognition && !isActivityRecognitionConfigured) {
-            Log.d(TAG, "Reinitializing activity recognition")
-            setupActivityRecognition()
-        }
-
-        updateNotification()
-    }
-
     override fun onDestroy() {
 
-        handler.removeCallbacks(healthCheckRunnable)
-        releaseWakeLock()
+        if (HAS_HEALTH_CHECK) {
+            handler.removeCallbacks(healthCheckRunnable)
+        }
 
         activityIntent?.let { pending ->
             activityRecognitionClient.removeActivityUpdates(pending)
@@ -177,6 +164,7 @@ class ActivityRecognitionService : Service() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NOTIFICATION_ID)
 
+        releaseWakeLock()
         isServiceRunning = false
         isActivityRecognitionConfigured = false
         isTransitionRecognitionConfigured = false
@@ -185,6 +173,50 @@ class ActivityRecognitionService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "onTaskRemoved")
+
+        if (HAS_HEALTH_CHECK) {
+            handler.removeCallbacks(healthCheckRunnable)
+        }
+
+        activityIntent?.let { pending ->
+            activityRecognitionClient.removeActivityUpdates(pending)
+                .addOnCompleteListener {
+                    Log.d(TAG, "Activity updates removed due to task removal")
+                }
+        }
+        transitionIntent?.let { pending ->
+            activityRecognitionClient.removeActivityTransitionUpdates(pending)
+                .addOnCompleteListener {
+                    Log.d(TAG, "Transition updates removed due to task removal")
+                }
+        }
+        releaseWakeLock()
+        stopSelf()
+    }
+
+    private fun scheduleServiceHealthCheck() {
+        if (!isServiceRunning) {
+            return
+        }
+
+        Log.d(TAG, "Performing service health check")
+
+        if (useTransitionRecognition && !isTransitionRecognitionConfigured) {
+            Log.d(TAG, "Reinitializing transition recognition")
+            setupTransitionRecognition()
+        }
+
+        if (useActivityRecognition && !isActivityRecognitionConfigured) {
+            Log.d(TAG, "Reinitializing activity recognition")
+            setupActivityRecognition()
+        }
+
+        updateNotification()
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -298,6 +330,7 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun initTransitionRequest() {
+        acquireWakeLock()
         val transitions = mutableListOf<ActivityTransition>()
 
         val activityTypes = listOf(
@@ -355,6 +388,7 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun initActivityUpdates() {
+        acquireWakeLock()
         activityRecognitionClient.requestActivityUpdates(detectionIntervalMillis.toLong(), activityIntent!!)
             .addOnSuccessListener {
                 Log.d(TAG, "requestActivityUpdates success")
@@ -392,5 +426,4 @@ class ActivityRecognitionService : Service() {
             Log.e(TAG, "Error releasing WakeLock: ${e.message}")
         }
     }
-
 }

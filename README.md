@@ -17,7 +17,7 @@ To use this plugin, add flutter_activity_recognition as a dependency in your pub
 For example:
 ```yaml
   dependencies:
-    custom_activity_recognition: ^0.0.13
+    custom_activity_recognition: ^0.0.16
 ```
 
 * Android
@@ -38,15 +38,21 @@ For example:
 
 Allow to enable or disable the hybrid model (only for Android).
 
+If you need to detect activity switching in both the foreground and background, I recommend:
+`useTransitionRecognition = true, useActivityRecognition = true`
+
+If you need to detect activity switching only in the foreground, I recommend:
+`useTransitionRecognition = true, useActivityRecognition = false`
+
 ```dart
   // CustomActivityRecognition.instance.startTracking() 
-  // useTransitionRecognition = true, useActivityRecognition = false
+  // useTransitionRecognition = true, useActivityRecognition = true
 
   CustomActivityRecognition.instance.startTracking(
     showNotification: true,
-    useTransitionRecognition: false,
+    useTransitionRecognition: true,
     useActivityRecognition: true,
-    detectionIntervalMillis: 0,
+    detectionIntervalMillis: 10000,
     confidenceThreshold: 50,
   );
 ```
