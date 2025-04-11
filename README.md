@@ -17,7 +17,7 @@ To use this plugin, add flutter_activity_recognition as a dependency in your pub
 For example:
 ```yaml
   dependencies:
-    custom_activity_recognition: ^0.0.16
+    custom_activity_recognition: ^0.0.17
 ```
 
 * Android
@@ -52,8 +52,8 @@ If you need to detect activity switching only in the foreground, I recommend:
     showNotification: true,
     useTransitionRecognition: true,
     useActivityRecognition: true,
-    detectionIntervalMillis: 10000,
-    confidenceThreshold: 50,
+    detectionIntervalMillis: 5000,
+    confidenceThreshold: 70,
   );
 ```
 

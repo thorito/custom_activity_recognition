@@ -38,8 +38,8 @@ abstract class CustomActivityRecognitionPlatform extends PlatformInterface {
     bool showNotification = true,
     bool useTransitionRecognition = true,
     bool useActivityRecognition = true,
-    int detectionIntervalMillis = 10000,
-    int confidenceThreshold = 50,
+    int detectionIntervalMillis = 5000,
+    int confidenceThreshold = 70,
   }) {
     throw UnimplementedError('startTracking() has not been implemented.');
   }

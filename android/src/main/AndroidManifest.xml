@@ -15,7 +15,13 @@
     <application>
 
         <receiver
-            android:name=".ActivityRecognitionReceiver" />
+            android:name=".ActivityRecognitionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.aikotelematics.activity_transition" />
+                <action android:name="com.aikotelematics.activity_recognition" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".ActivityRecognitionService"

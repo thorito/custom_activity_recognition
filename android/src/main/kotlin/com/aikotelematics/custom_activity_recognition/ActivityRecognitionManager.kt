@@ -365,8 +365,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
     fun startTracking(showNotification: Boolean = true,
                       useTransitionRecognition: Boolean = true,
                       useActivityRecognition: Boolean = false,
-                      detectionIntervalMillis: Int = 10000,
-                      confidenceThreshold: Int = 50,
+                      detectionIntervalMillis: Int = 5000,
+                      confidenceThreshold: Int = 70,
                       callback: (Boolean) -> Unit) {
 
         if (!hasRequiredPermissions()) {

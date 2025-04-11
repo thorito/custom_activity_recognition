@@ -63,8 +63,8 @@ class MethodChannelCustomActivityRecognition
     bool showNotification = true,
     bool useTransitionRecognition = true,
     bool useActivityRecognition = true,
-    int detectionIntervalMillis = 10000,
-    int confidenceThreshold = 50,
+    int detectionIntervalMillis = 5000,
+    int confidenceThreshold = 70,
   }) async {
     try {
       final Map<String, dynamic> arguments = Platform.isAndroid
