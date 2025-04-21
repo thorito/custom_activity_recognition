@@ -7,7 +7,7 @@ issue_tracker: https://github.com/thorito/custom_activity_recognition/issues?q=i
 
 environment:
   sdk: ^3.5.4
-  flutter: '>=3.3.0'
+  flutter: '>=3.29.3'
 
 dependencies:
   equatable: ^2.0.7

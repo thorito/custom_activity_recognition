@@ -84,6 +84,10 @@ class ActivityRecognitionService : Service() {
             useTransitionRecognition = intent.getBooleanExtra("useTransitionRecognition", true)
         }
 
+        if (intent != null && intent.hasExtra("useActivityRecognition")) {
+            useActivityRecognition = intent.getBooleanExtra("useActivityRecognition", true)
+        }
+
         if (intent != null && intent.hasExtra("detectionIntervalMillis")) {
             detectionIntervalMillis = intent.getIntExtra("detectionIntervalMillis", DEFAULT_DETECTION_INTERVAL_MILLIS)
         }
