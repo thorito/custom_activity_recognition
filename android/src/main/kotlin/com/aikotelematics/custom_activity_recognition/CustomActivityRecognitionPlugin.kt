@@ -28,7 +28,11 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
   private var binaryMessenger: BinaryMessenger? = null
   private var pendingResult: Result? = null
 
-  private val TAG = "CustomActivityRecognitionPlugin"
+  companion object {
+    private const val TAG = "CustomActivityRecognitionPlugin"
+    const val DEFAULT_DETECTION_INTERVAL_MILLIS: Int = 10000
+    const val DEFAULT_CONFIDENCE_THRESHOLD: Int = 50
+  }
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     context = flutterPluginBinding.applicationContext
@@ -87,9 +91,9 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
       "startTracking" -> {
         val showNotification = call.argument<Boolean>("showNotification") ?: true
         val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: true
-        val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: true
-        val detectionIntervalMillis = call.argument<Int>("detectionIntervalMillis") ?: 5000
-        val confidenceThreshold = call.argument<Int>("confidenceThreshold") ?: 70
+        val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: false
+        val detectionIntervalMillis = call.argument<Int>("detectionIntervalMillis") ?: DEFAULT_DETECTION_INTERVAL_MILLIS
+        val confidenceThreshold = call.argument<Int>("confidenceThreshold") ?: DEFAULT_CONFIDENCE_THRESHOLD
 
         activityRecognitionManager.startTracking(
           showNotification = showNotification,

@@ -13,8 +13,9 @@ import java.util.Date
 import java.util.Locale
 import android.content.pm.ServiceInfo
 import android.os.PowerManager
-import android.graphics.Color
 import android.content.IntentFilter
+import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
 
 class ActivityRecognitionService : Service() {
 
@@ -30,12 +31,14 @@ class ActivityRecognitionService : Service() {
         private var isTransitionRecognitionConfigured = false
         private var isActivityRecognitionConfigured = false
 
-        var detectionIntervalMillis: Int = 5000
-        var confidenceThreshold: Int = 70
+        var detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS
+        var confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD
+
         fun isRunning() = isServiceRunning
     }
 
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
+    private lateinit var notificationManager: NotificationManager
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var showNotification: Boolean = true
@@ -51,6 +54,8 @@ class ActivityRecognitionService : Service() {
         activityRecognitionClient = ActivityRecognition.getClient(this)
         isServiceRunning = true
 
+        notificationManager =
+            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
     }
 
@@ -71,15 +76,21 @@ class ActivityRecognitionService : Service() {
             Log.e(TAG, "Error starting foreground service: ${e.message}")
         }
 
-        showNotification = intent?.getBooleanExtra("showNotification", true) ?: true
+        if (intent != null && intent.hasExtra("showNotification")) {
+            showNotification = intent.getBooleanExtra("showNotification", true)
+        }
 
-        useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", true) ?: true
-        useActivityRecognition = intent?.getBooleanExtra("useActivityRecognition", true) ?: true
-        detectionIntervalMillis =
-            intent?.getIntExtra("detectionIntervalMillis", detectionIntervalMillis)
-                ?: detectionIntervalMillis
-        confidenceThreshold =
-            intent?.getIntExtra("confidenceThreshold", confidenceThreshold) ?: confidenceThreshold
+        if (intent != null && intent.hasExtra("useTransitionRecognition")) {
+            useTransitionRecognition = intent.getBooleanExtra("useTransitionRecognition", true)
+        }
+
+        if (intent != null && intent.hasExtra("detectionIntervalMillis")) {
+            detectionIntervalMillis = intent.getIntExtra("detectionIntervalMillis", DEFAULT_DETECTION_INTERVAL_MILLIS)
+        }
+
+        if (intent != null && intent.hasExtra("confidenceThreshold")) {
+            confidenceThreshold = intent.getIntExtra("confidenceThreshold", DEFAULT_CONFIDENCE_THRESHOLD)
+        }
 
         if (!isTransitionRecognitionConfigured && useTransitionRecognition) {
             acquireWakeLock()
@@ -93,8 +104,10 @@ class ActivityRecognitionService : Service() {
             isActivityRecognitionConfigured = true
         }
 
+
         Log.d(
             TAG, "onStartCommand: ${intent?.action}, " +
+                    "showNotification: $showNotification, " +
                     "useTransitionRecognition: $useTransitionRecognition, " +
                     "useActivityRecognition: $useActivityRecognition, " +
                     "detectionIntervalMillis: $detectionIntervalMillis, " +
@@ -104,6 +117,7 @@ class ActivityRecognitionService : Service() {
         when (intent?.action) {
             "UPDATE_ACTIVITY" -> {
                 var changes = false
+
                 val activityExtra = intent.getStringExtra("activity") ?: "UNKNOWN"
                 val timestampExtra = intent.getLongExtra("timestamp", 0)
                 if (timestampExtra > 0 && timestampExtra != timestamp) {
@@ -124,7 +138,7 @@ class ActivityRecognitionService : Service() {
 
         updateNotification()
 
-        return START_REDELIVER_INTENT
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -142,8 +156,6 @@ class ActivityRecognitionService : Service() {
                 }
         }
 
-        val notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NOTIFICATION_ID)
 
         releaseWakeLock()
@@ -179,9 +191,6 @@ class ActivityRecognitionService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
             val normalChannel = NotificationChannel(
                 CHANNEL_ID,
                 "Activity Recognition",
@@ -238,21 +247,17 @@ class ActivityRecognitionService : Service() {
         if (showNotification) {
             builder.setContentTitle("Activity Recognition")
                 .setContentText("$currentActivity$timestampFormatted")
-                .setSmallIcon(android.R.drawable.ic_notification_overlay)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE)
-                .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setPriority(NotificationCompat.PRIORITY_MIN)
                 .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-                .setColor(Color.TRANSPARENT)
                 .setOngoing(true)
                 .setAutoCancel(false)
         } else {
             builder.setContentTitle("")
                 .setContentText("")
-                .setSmallIcon(android.R.drawable.ic_notification_overlay)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setPriority(NotificationCompat.PRIORITY_MIN)
                 .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-                .setColor(Color.TRANSPARENT)
                 .setOngoing(true)
                 .setSilent(true)
         }
@@ -266,8 +271,6 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun updateNotification() {
-        val notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, createNotification())
     }
 

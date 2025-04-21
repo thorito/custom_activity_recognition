@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:custom_activity_recognition/activity_types.dart';
+import 'package:custom_activity_recognition/constants.dart';
 import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -62,9 +63,9 @@ class MethodChannelCustomActivityRecognition
   Future<bool> startTracking({
     bool showNotification = true,
     bool useTransitionRecognition = true,
-    bool useActivityRecognition = true,
-    int detectionIntervalMillis = 5000,
-    int confidenceThreshold = 70,
+    bool useActivityRecognition = false,
+    int detectionIntervalMillis = defaultDetectionIntervalMillis,
+    int confidenceThreshold = defaultConfidenceThreshold,
   }) async {
     try {
       final Map<String, dynamic> arguments = Platform.isAndroid

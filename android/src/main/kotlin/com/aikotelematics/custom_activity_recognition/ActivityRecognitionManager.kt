@@ -14,6 +14,8 @@ import androidx.core.content.ContextCompat
 import com.aikotelematics.custom_activity_recognition.ActivityRecognitionService.Companion
 import io.flutter.plugin.common.EventChannel
 import android.util.Log
+import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
 import java.lang.ref.WeakReference
 
 class ActivityRecognitionManager(private val context: Context) : EventChannel.StreamHandler {
@@ -52,20 +54,28 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         activityReference = WeakReference(activity)
         permissionStatusCallback = callback
 
+        Log.d(TAG, "Checking permission status")
+        val sharedPrefs = context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
+
+        // Check location permissions for Android < Q (API 29)
         if (SDK_INT < VERSION_CODES.Q) {
-            if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                !hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)) {
-                if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION)) {
+            val hasLocationPerms = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) &&
+                    hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+            if (!hasLocationPerms) {
+                val hasRequestedLocation = sharedPrefs.getBoolean("has_requested_location", false)
+                val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity, Manifest.permission.ACCESS_FINE_LOCATION)
+
+                Log.d(TAG, "Location permissions: hasRequested=$hasRequestedLocation, shouldShowRationale=$shouldShowRationale")
+
+                // Fix: Only consider "PERMANENTLY_DENIED" if we've requested before
+                if (!shouldShowRationale && hasRequestedLocation) {
+                    callback("PERMANENTLY_DENIED")
+                } else if (shouldShowRationale) {
                     callback("DENIED")
                 } else {
-                    val sharedPrefs = context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
-                    val hasRequestedBefore = sharedPrefs.getBoolean("has_requested_location", false)
-
-                    if (hasRequestedBefore) {
-                        callback("PERMANENTLY_DENIED")
-                    } else {
-                        callback("NOT_DETERMINED")
-                    }
+                    callback("NOT_DETERMINED")
                 }
                 return
             }
@@ -73,76 +83,86 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
             return
         }
 
+        // Check ACTIVITY_RECOGNITION permission for Android Q+ (API 29+)
         if (!hasPermission(Manifest.permission.ACTIVITY_RECOGNITION)) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACTIVITY_RECOGNITION)) {
+            val hasRequestedAR = sharedPrefs.getBoolean("has_requested_activity_recognition", false)
+            val shouldShowRationaleAR = ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.ACTIVITY_RECOGNITION)
+
+            Log.d(TAG, "Activity recognition: hasRequested=$hasRequestedAR, shouldShowRationale=$shouldShowRationaleAR")
+
+            // Fix: Only consider "PERMANENTLY_DENIED" if we've requested before
+            if (!shouldShowRationaleAR && hasRequestedAR) {
+                callback("PERMANENTLY_DENIED")
+                return
+            } else if (shouldShowRationaleAR) {
                 callback("DENIED")
                 return
             } else {
-                val sharedPrefs = context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
-                val hasRequestedActivityRecognition = sharedPrefs.getBoolean("has_requested_activity_recognition", false)
-
-                if (hasRequestedActivityRecognition) {
-                    callback("PERMANENTLY_DENIED")
-                    return
-                } else {
-                    callback("NOT_DETERMINED")
-                    return
-                }
+                callback("NOT_DETERMINED")
+                return
             }
         }
 
+        // Check location permissions for Android Q+ (API 29+)
         if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
             !hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION)) {
+
+            val hasRequestedLocation = sharedPrefs.getBoolean("has_requested_location", false)
+            val shouldShowRationaleLocation = ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.ACCESS_FINE_LOCATION)
+
+            Log.d(TAG, "Location permissions: hasRequested=$hasRequestedLocation, shouldShowRationale=$shouldShowRationaleLocation")
+
+            if (!shouldShowRationaleLocation && hasRequestedLocation) {
+                callback("PERMANENTLY_DENIED")
+                return
+            } else if (shouldShowRationaleLocation) {
                 callback("DENIED")
                 return
             } else {
-                val sharedPrefs = context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
-                val hasRequestedLocation = sharedPrefs.getBoolean("has_requested_location", false)
-
-                if (hasRequestedLocation) {
-                    callback("PERMANENTLY_DENIED")
-                    return
-                } else {
-                    callback("NOT_DETERMINED")
-                    return
-                }
+                callback("NOT_DETERMINED")
+                return
             }
         }
 
+        // Check notification permission for Android Tiramisu+ (API 33+)
         if (SDK_INT >= VERSION_CODES.TIRAMISU && !hasPermission(Manifest.permission.POST_NOTIFICATIONS)) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)) {
+            val hasRequestedNotifications = sharedPrefs.getBoolean("has_requested_notifications", false)
+            val shouldShowRationaleNotifications = ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.POST_NOTIFICATIONS)
+
+            Log.d(TAG, "Notifications: hasRequested=$hasRequestedNotifications, shouldShowRationale=$shouldShowRationaleNotifications")
+
+            if (!shouldShowRationaleNotifications && hasRequestedNotifications) {
+                callback("PERMANENTLY_DENIED")
+                return
+            } else if (shouldShowRationaleNotifications) {
                 callback("DENIED")
                 return
             } else {
-                val sharedPrefs = context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
-                val hasRequestedNotifications = sharedPrefs.getBoolean("has_requested_notifications", false)
-
-                if (hasRequestedNotifications) {
-                    callback("PERMANENTLY_DENIED")
-                    return
-                } else {
-                    callback("NOT_DETERMINED")
-                    return
-                }
+                callback("NOT_DETERMINED")
+                return
             }
         }
 
+        // Check background location permission for Android Q+ (API 29+)
         if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            val hasRequestedBackgroundLocation = sharedPrefs.getBoolean("has_requested_background_location", false)
+            val shouldShowRationaleBackgroundLocation = ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+
+            Log.d(TAG, "Background location: hasRequested=$hasRequestedBackgroundLocation, shouldShowRationale=$shouldShowRationaleBackgroundLocation")
+
+            if (!shouldShowRationaleBackgroundLocation && hasRequestedBackgroundLocation) {
+                callback("PERMANENTLY_DENIED")
+                return
+            } else if (shouldShowRationaleBackgroundLocation) {
                 callback("DENIED")
                 return
             } else {
-                val sharedPrefs = context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
-                val hasRequestedBackgroundLocation = sharedPrefs.getBoolean("has_requested_background_location", false)
-
-                if (hasRequestedBackgroundLocation) {
-                    callback("PERMANENTLY_DENIED")
-                    return
-                } else {
-                    callback("NOT_DETERMINED")
-                    return
-                }
+                callback("NOT_DETERMINED")
+                return
             }
         }
 
@@ -365,8 +385,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
     fun startTracking(showNotification: Boolean = true,
                       useTransitionRecognition: Boolean = true,
                       useActivityRecognition: Boolean = false,
-                      detectionIntervalMillis: Int = 5000,
-                      confidenceThreshold: Int = 70,
+                      detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS,
+                      confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD,
                       callback: (Boolean) -> Unit) {
 
         if (!hasRequiredPermissions()) {

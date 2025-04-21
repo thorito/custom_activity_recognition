@@ -1,3 +1,4 @@
+import 'package:custom_activity_recognition/constants.dart';
 import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
 
 import 'activity_types.dart';
@@ -29,15 +30,15 @@ class CustomActivityRecognition {
   /// Starts tracking user activity
   /// [useTransitionRecognition] and [useActivityRecognition] are optional
   /// useTransitionRecognition is true by default
-  /// useActivityRecognition is true by default
-  /// detectionIntervalMillis is 5000 by default
-  /// confidenceThreshold is 70 by default
+  /// useActivityRecognition is false by default
+  /// detectionIntervalMillis is 10000 by default
+  /// confidenceThreshold is 50 by default
   Future<bool> startTracking({
     bool showNotification = true,
     bool useTransitionRecognition = true,
-    bool useActivityRecognition = true,
-    int detectionIntervalMillis = 5000,
-    int confidenceThreshold = 70,
+    bool useActivityRecognition = false,
+    int detectionIntervalMillis = defaultDetectionIntervalMillis,
+    int confidenceThreshold = defaultConfidenceThreshold,
   }) async =>
       await CustomActivityRecognitionPlatform.instance.startTracking(
         showNotification: showNotification,

@@ -51,9 +51,9 @@ If you need to detect activity switching only in the foreground, I recommend:
   CustomActivityRecognition.instance.startTracking(
     showNotification: true,
     useTransitionRecognition: true,
-    useActivityRecognition: true,
-    detectionIntervalMillis: 5000,
-    confidenceThreshold: 70,
+    useActivityRecognition: false,
+    detectionIntervalMillis: 10000,
+    confidenceThreshold: 50,
   );
 ```
 

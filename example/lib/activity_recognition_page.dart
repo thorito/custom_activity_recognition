@@ -1,5 +1,6 @@
 import 'package:app_settings/app_settings.dart';
 import 'package:custom_activity_recognition/activity_types.dart';
+import 'package:custom_activity_recognition/constants.dart';
 import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
 import 'package:custom_activity_recognition/custom_activity_recognition.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,9 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
   bool _isAvailable = false;
   CustomActivityPermissionStatus _permissionStatus =
       CustomActivityPermissionStatus.notDetermined;
+  bool _showNotification = true;
+  bool _useTransitionRecognition = true;
+  bool _useActivityRecognition = false;
   bool _isRequestingPermissions = false;
   bool _isTracking = false;
   String _currentActivity = "UNKNOWN";
@@ -54,99 +58,137 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
         ),
         body: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Status:',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      SizedBox(height: 8),
-                      _buildStatusItem('Available', _isAvailable),
-                      _buildPermissionStatusItem(
-                          'Permission', _permissionStatus),
-                      _buildStatusItem('Tracking', _isTracking),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: Card(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Current activity:',
+                        Text('Status:',
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(height: 8),
-                        Text(_currentActivity, style: TextStyle(fontSize: 24)),
-                        if (_lastUpdate != null)
-                          Text(
-                            'Last update: ${_formatDateTime(_lastUpdate!)}',
-                            style: TextStyle(color: Colors.grey),
-                          ),
+                        _buildStatusItem('Available', _isAvailable),
+                        _buildPermissionStatusItem(
+                            'Permission', _permissionStatus),
+                        _buildStatusItem('Tracking', _isTracking),
                       ],
                     ),
                   ),
                 ),
-              ),
-              SizedBox(height: 16),
-              if (_permissionStatus !=
-                  CustomActivityPermissionStatus.authorized)
+                SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Current activity:',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          SizedBox(height: 8),
+                          Text(_currentActivity,
+                              style: TextStyle(fontSize: 24)),
+                          if (_lastUpdate != null)
+                            Text(
+                              'Last update: ${_formatDateTime(_lastUpdate!)}',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                SwitchListTile(
+                  value: _showNotification,
+                  onChanged: _isTracking
+                      ? null
+                      : (onChanged) {
+                          setState(() {
+                            _showNotification = onChanged;
+                          });
+                        },
+                  title: Text('Show notification'),
+                ),
+                SwitchListTile(
+                  value: _useTransitionRecognition,
+                  onChanged: _isTracking
+                      ? null
+                      : (onChanged) {
+                          setState(() {
+                            _useTransitionRecognition = onChanged;
+                          });
+                        },
+                  title: Text('Use Transition Recognition'),
+                ),
+                SwitchListTile(
+                  value: _useActivityRecognition,
+                  onChanged: _isTracking
+                      ? null
+                      : (onChanged) {
+                          setState(() {
+                            _useActivityRecognition = onChanged;
+                          });
+                        },
+                  title: Text('Use Activity Recognition'),
+                ),
+                if (_permissionStatus !=
+                    CustomActivityPermissionStatus.authorized)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed:
+                          _isRequestingPermissions ? null : _requestPermissions,
+                      child: _isRequestingPermissions
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Requesting permissions...',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              'Request Permissions',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                    ),
+                  ),
+                SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed:
-                        _isRequestingPermissions ? null : _requestPermissions,
-                    child: _isRequestingPermissions
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Requesting permissions...',
-                                style: TextStyle(fontSize: 16),
-                              ),
-                            ],
-                          )
-                        : Text(
-                            'Request Permissions',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                    onPressed: _permissionStatus ==
+                                CustomActivityPermissionStatus.authorized &&
+                            (_useTransitionRecognition ||
+                                _useActivityRecognition)
+                        ? (_isTracking ? _stopTracking : _startTracking)
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isTracking ? Colors.red : Colors.green,
+                    ),
+                    child: Text(
+                      _isTracking ? 'Stop Tracking' : 'Start Tracking',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
                   ),
                 ),
-              SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _permissionStatus ==
-                          CustomActivityPermissionStatus.authorized
-                      ? (_isTracking ? _stopTracking : _startTracking)
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isTracking ? Colors.red : Colors.green,
-                  ),
-                  child: Text(
-                    _isTracking ? 'Stop Tracking' : 'Start Tracking',
-                    style: TextStyle(fontSize: 16, color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -247,11 +289,11 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
     }
 
     final success = await _activityRecognition.startTracking(
-      showNotification: true,
-      useTransitionRecognition: true,
-      useActivityRecognition: true,
-      detectionIntervalMillis: 5000,
-      confidenceThreshold: 70,
+      showNotification: _showNotification,
+      useTransitionRecognition: _useTransitionRecognition,
+      useActivityRecognition: _useActivityRecognition,
+      detectionIntervalMillis: defaultDetectionIntervalMillis,
+      confidenceThreshold: defaultConfidenceThreshold,
     );
 
     setState(() {
@@ -335,7 +377,7 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
       case CustomActivityPermissionStatus.permanentlyDenied:
         return Colors.red;
       case CustomActivityPermissionStatus.notDetermined:
-        return Colors.blue;
+        return Colors.grey;
     }
   }
 
@@ -365,7 +407,7 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
       case CustomActivityPermissionStatus.permanentlyDenied:
         return Icons.block;
       case CustomActivityPermissionStatus.notDetermined:
-        return Icons.help_outline;
+        return Icons.pending_outlined;
     }
   }
 
