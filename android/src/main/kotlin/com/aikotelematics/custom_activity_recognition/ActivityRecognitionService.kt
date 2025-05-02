@@ -1,11 +1,13 @@
 package com.aikotelematics.custom_activity_recognition
 
+import android.annotation.SuppressLint
 import android.app.*
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -48,13 +50,59 @@ class ActivityRecognitionService : Service() {
     private var currentActivity: String = "UNKNOWN"
     private var timestamp: Long = 0
 
+    // Heartbeat mechanism for monitoring activity recognition
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
+
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            // Check if we've been in STILL or UNKNOWN state for a long time
+            if ((currentActivity == "STILL" || currentActivity == "UNKNOWN") &&
+                System.currentTimeMillis() - timestamp > 30 * 60 * 1000
+            ) {
+                // Only restart if we've been in STILL for 30 minutes or more
+                Log.d(TAG, "Long period in STILL or UNKNOWN state, verifying recognition system")
+
+                // Verify and restart only if necessary
+                if (!isTransitionRecognitionConfigured && useTransitionRecognition) {
+                    Log.d(TAG, "Transition recognition not configured, setting up...")
+                    setupTransitionRecognition()
+                }
+
+                if (!isActivityRecognitionConfigured && useActivityRecognition) {
+                    Log.d(TAG, "Activity recognition not configured, setting up...")
+                    setupActivityRecognition()
+                }
+
+                // Schedule next check in 30 minutes if still in STILL state
+                heartbeatHandler.postDelayed(this, 30 * 60 * 1000L)
+            } else {
+                // If not in STILL state or only for a short time, check again in 2 hours
+                Log.d(TAG, "Normal activity state, scheduling next check in 2 hours")
+                heartbeatHandler.postDelayed(this, 2 * 60 * 60 * 1000L)
+            }
+        }
+    }
+
+    // Start the heartbeat monitoring
+    private fun startHeartbeat() {
+        Log.d(TAG, "Starting heartbeat monitoring")
+        heartbeatHandler.postDelayed(heartbeatRunnable, 60 * 60 * 1000L) // First check in 1 hour
+    }
+
+    // Stop the heartbeat monitoring
+    private fun stopHeartbeat() {
+        Log.d(TAG, "Stopping heartbeat monitoring")
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+    }
+
+    @SuppressLint("InlinedApi")
     override fun onCreate() {
         super.onCreate()
         activityRecognitionClient = ActivityRecognition.getClient(this)
         isServiceRunning = true
 
         notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -67,6 +115,9 @@ class ActivityRecognitionService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, createNotification())
         }
+
+        // Start heartbeat monitoring
+        startHeartbeat()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -127,6 +178,9 @@ class ActivityRecognitionService : Service() {
                 if (activityExtra != currentActivity) {
                     changes = true
                     currentActivity = activityExtra
+
+                    stopHeartbeat()
+                    startHeartbeat()
                 }
 
                 if (changes) {
@@ -141,6 +195,7 @@ class ActivityRecognitionService : Service() {
     }
 
     override fun onDestroy() {
+        stopHeartbeat()
 
         activityIntent?.let { pending ->
             activityRecognitionClient.removeActivityUpdates(pending)
@@ -184,6 +239,8 @@ class ActivityRecognitionService : Service() {
                     Log.d(TAG, "Transition updates removed due to task removal")
                 }
         }
+
+        stopHeartbeat()
         releaseWakeLock()
         stopSelf()
     }
@@ -383,7 +440,7 @@ class ActivityRecognitionService : Service() {
 
     private fun acquireWakeLock() {
         if (wakeLock == null) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "ActivityRecognition:WakeLock"
@@ -392,7 +449,7 @@ class ActivityRecognitionService : Service() {
         }
 
         if (wakeLock?.isHeld == false) {
-            wakeLock?.acquire(3 * 60 * 1000L) // 3 minutes
+            wakeLock?.acquire(30000L) // 30 seconds
         }
     }
 

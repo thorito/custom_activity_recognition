@@ -17,7 +17,7 @@ To use this plugin, add flutter_activity_recognition as a dependency in your pub
 For example:
 ```yaml
   dependencies:
-    custom_activity_recognition: ^0.0.20
+    custom_activity_recognition: ^0.0.21
 ```
 
 * Android

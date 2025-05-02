@@ -1,3 +1,7 @@
+## 0.0.21
+
+* Added Heartbeat.
+
 ## 0.0.20
 
 * Updated dependencies.
