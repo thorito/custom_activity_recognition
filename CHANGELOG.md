@@ -1,3 +1,7 @@
+## 0.0.20
+
+* Updated dependencies.
+
 ## 0.0.16
 
 * Updated readme and example.

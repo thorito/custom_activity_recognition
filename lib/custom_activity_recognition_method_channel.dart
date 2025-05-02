@@ -63,7 +63,7 @@ class MethodChannelCustomActivityRecognition
   Future<bool> startTracking({
     bool showNotification = true,
     bool useTransitionRecognition = true,
-    bool useActivityRecognition = false,
+    bool useActivityRecognition = true,
     int detectionIntervalMillis = defaultDetectionIntervalMillis,
     int confidenceThreshold = defaultConfidenceThreshold,
   }) async {

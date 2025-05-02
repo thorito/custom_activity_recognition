@@ -1,21 +1,20 @@
 package com.aikotelematics.custom_activity_recognition
 
 import android.app.*
-import android.content.Intent
-import android.os.IBinder
-import androidx.core.app.NotificationCompat
-import android.os.Build
 import android.content.Context
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
 import com.google.android.gms.location.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.content.pm.ServiceInfo
-import android.os.PowerManager
-import android.content.IntentFilter
-import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
-import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
 
 class ActivityRecognitionService : Service() {
 
@@ -57,24 +56,20 @@ class ActivityRecognitionService : Service() {
         notificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    createNotification(),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, createNotification())
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting foreground service: ${e.message}")
-        }
 
         if (intent != null && intent.hasExtra("showNotification")) {
             showNotification = intent.getBooleanExtra("showNotification", true)

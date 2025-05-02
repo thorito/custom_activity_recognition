@@ -38,7 +38,9 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
             val activityType = getActivityType(activity.type)
             Log.d(TAG, "⭕️ Activity detected: $activityType, " +
                     "confidence: ${activity.confidence}")
-            if (activity.confidence > ActivityRecognitionService.confidenceThreshold) {
+            if (activity.type != DetectedActivity.TILTING &&
+                activity.confidence > ActivityRecognitionService.confidenceThreshold
+            ) {
                 val timestamp = it.time
                 sendActivityUpdate(context, activityType, timestamp)
             }
