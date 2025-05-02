@@ -51,6 +51,7 @@ class ActivityRecognitionService : Service() {
     private var timestamp: Long = 0
 
     // Heartbeat mechanism for monitoring activity recognition
+    private var initHeatbeat = false
     private val heartbeatHandler = Handler(Looper.getMainLooper())
 
     private val heartbeatRunnable = object : Runnable {
@@ -63,12 +64,12 @@ class ActivityRecognitionService : Service() {
                 Log.d(TAG, "Long period in STILL or UNKNOWN state, verifying recognition system")
 
                 // Verify and restart only if necessary
-                if (!isTransitionRecognitionConfigured && useTransitionRecognition) {
+                if (isRunning() && useTransitionRecognition) {
                     Log.d(TAG, "Transition recognition not configured, setting up...")
                     setupTransitionRecognition()
                 }
 
-                if (!isActivityRecognitionConfigured && useActivityRecognition) {
+                if (isRunning() && useActivityRecognition) {
                     Log.d(TAG, "Activity recognition not configured, setting up...")
                     setupActivityRecognition()
                 }
@@ -117,7 +118,10 @@ class ActivityRecognitionService : Service() {
         }
 
         // Start heartbeat monitoring
-        startHeartbeat()
+        if (!initHeatbeat) {
+            initHeatbeat = true
+            startHeartbeat()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -178,9 +182,6 @@ class ActivityRecognitionService : Service() {
                 if (activityExtra != currentActivity) {
                     changes = true
                     currentActivity = activityExtra
-
-                    stopHeartbeat()
-                    startHeartbeat()
                 }
 
                 if (changes) {
@@ -213,6 +214,7 @@ class ActivityRecognitionService : Service() {
         notificationManager.cancel(NOTIFICATION_ID)
 
         releaseWakeLock()
+        initHeatbeat = false
         isServiceRunning = false
         isActivityRecognitionConfigured = false
         isTransitionRecognitionConfigured = false
