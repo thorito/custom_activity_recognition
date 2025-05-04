@@ -2,13 +2,13 @@ package com.aikotelematics.custom_activity_recognition
 
 import android.annotation.SuppressLint
 import android.app.*
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
@@ -24,22 +24,31 @@ class ActivityRecognitionService : Service() {
         private const val TAG = "ActivityRecognitionService"
         private const val ACTIVITY_REQUEST_CODE = 200
         private const val TRANSITION_REQUEST_CODE = 201
+        private const val WAKEUP_REQUEST_CODE = 202
 
         private const val NOTIFICATION_ID = 7502
+        private const val ACTION_WAKEUP = "com.aikotelematics.WAKEUP_ACTION"
         private const val CHANNEL_ID = "activity_recognition_channel"
+
         private const val SILENT_CHANNEL_ID = "activity_recognition_silent_channel"
+        private const val WAKEUP_INTERVAL = 10 * 60 * 1000L // 10 minutes
+
+        private const val WAKELOCK_TIMEOUT = 2 * 60 * 1000L // 2 minutes
         private var isServiceRunning = false
         private var isTransitionRecognitionConfigured = false
+
         private var isActivityRecognitionConfigured = false
-
         var detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS
-        var confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD
 
+        var confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD
         fun isRunning() = isServiceRunning
     }
 
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private lateinit var notificationManager: NotificationManager
+    private lateinit var alarmManager: AlarmManager
+    private lateinit var powerManager: PowerManager
+    private lateinit var handler: android.os.Handler
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var showNotification: Boolean = true
@@ -47,54 +56,9 @@ class ActivityRecognitionService : Service() {
     private var useActivityRecognition: Boolean = true
     private var activityIntent: PendingIntent? = null
     private var transitionIntent: PendingIntent? = null
+    private var wakeupIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
     private var timestamp: Long = 0
-
-    // Heartbeat mechanism for monitoring activity recognition
-    private var initHeatbeat = false
-    private val heartbeatHandler = Handler(Looper.getMainLooper())
-
-    private val heartbeatRunnable = object : Runnable {
-        override fun run() {
-            // Check if we've been in STILL or UNKNOWN state for a long time
-            if ((currentActivity == "STILL" || currentActivity == "UNKNOWN") &&
-                System.currentTimeMillis() - timestamp > 30 * 60 * 1000
-            ) {
-                // Only restart if we've been in STILL for 30 minutes or more
-                Log.d(TAG, "Long period in STILL or UNKNOWN state, verifying recognition system")
-
-                // Verify and restart only if necessary
-                if (isRunning() && useTransitionRecognition) {
-                    Log.d(TAG, "Transition recognition not configured, setting up...")
-                    setupTransitionRecognition()
-                }
-
-                if (isRunning() && useActivityRecognition) {
-                    Log.d(TAG, "Activity recognition not configured, setting up...")
-                    setupActivityRecognition()
-                }
-
-                // Schedule next check in 30 minutes if still in STILL state
-                heartbeatHandler.postDelayed(this, 30 * 60 * 1000L)
-            } else {
-                // If not in STILL state or only for a short time, check again in 2 hours
-                Log.d(TAG, "Normal activity state, scheduling next check in 2 hours")
-                heartbeatHandler.postDelayed(this, 2 * 60 * 60 * 1000L)
-            }
-        }
-    }
-
-    // Start the heartbeat monitoring
-    private fun startHeartbeat() {
-        Log.d(TAG, "Starting heartbeat monitoring")
-        heartbeatHandler.postDelayed(heartbeatRunnable, 60 * 60 * 1000L) // First check in 1 hour
-    }
-
-    // Stop the heartbeat monitoring
-    private fun stopHeartbeat() {
-        Log.d(TAG, "Stopping heartbeat monitoring")
-        heartbeatHandler.removeCallbacks(heartbeatRunnable)
-    }
 
     @SuppressLint("InlinedApi")
     override fun onCreate() {
@@ -104,7 +68,12 @@ class ActivityRecognitionService : Service() {
 
         notificationManager =
             getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        handler = android.os.Handler(android.os.Looper.getMainLooper())
+
         createNotificationChannel()
+        setupWakeupAlarm()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -116,15 +85,16 @@ class ActivityRecognitionService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, createNotification())
         }
-
-        // Start heartbeat monitoring
-        if (!initHeatbeat) {
-            initHeatbeat = true
-            startHeartbeat()
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand: ${intent?.action}")
+
+        if (intent?.action == ACTION_WAKEUP) {
+            handleWakeup()
+            scheduleNextWakeup()
+            return START_STICKY
+        }
 
         if (intent != null && intent.hasExtra("showNotification")) {
             showNotification = intent.getBooleanExtra("showNotification", true)
@@ -146,27 +116,26 @@ class ActivityRecognitionService : Service() {
             confidenceThreshold = intent.getIntExtra("confidenceThreshold", DEFAULT_CONFIDENCE_THRESHOLD)
         }
 
+        if (!isActivityRecognitionConfigured) {
+            Log.d(
+                TAG, "onStartCommand: ${intent?.action}, " +
+                        "showNotification: $showNotification, " +
+                        "useTransitionRecognition: $useTransitionRecognition, " +
+                        "useActivityRecognition: $useActivityRecognition, " +
+                        "detectionIntervalMillis: $detectionIntervalMillis, " +
+                        "confidenceThreshold: $confidenceThreshold"
+            )
+        }
+
         if (!isTransitionRecognitionConfigured && useTransitionRecognition) {
-            acquireWakeLock()
             setupTransitionRecognition()
             isTransitionRecognitionConfigured = true
         }
 
         if (!isActivityRecognitionConfigured && useActivityRecognition) {
-            acquireWakeLock()
             setupActivityRecognition()
             isActivityRecognitionConfigured = true
         }
-
-
-        Log.d(
-            TAG, "onStartCommand: ${intent?.action}, " +
-                    "showNotification: $showNotification, " +
-                    "useTransitionRecognition: $useTransitionRecognition, " +
-                    "useActivityRecognition: $useActivityRecognition, " +
-                    "detectionIntervalMillis: $detectionIntervalMillis, " +
-                    "confidenceThreshold: $confidenceThreshold"
-        )
 
         when (intent?.action) {
             "UPDATE_ACTIVITY" -> {
@@ -196,25 +165,15 @@ class ActivityRecognitionService : Service() {
     }
 
     override fun onDestroy() {
-        stopHeartbeat()
 
-        activityIntent?.let { pending ->
-            activityRecognitionClient.removeActivityUpdates(pending)
-                .addOnCompleteListener {
-                    Log.d(TAG, "Activity updates removed")
-                }
-        }
-        transitionIntent?.let { pending ->
-            activityRecognitionClient.removeActivityTransitionUpdates(pending)
-                .addOnCompleteListener {
-                    Log.d(TAG, "Transition updates removed")
-                }
-        }
+        cancelWakeupAlarm()
+        cleanupRecognition()
 
         notificationManager.cancel(NOTIFICATION_ID)
 
         releaseWakeLock()
-        initHeatbeat = false
+        handler.removeCallbacksAndMessages(null)
+
         isServiceRunning = false
         isActivityRecognitionConfigured = false
         isTransitionRecognitionConfigured = false
@@ -227,24 +186,149 @@ class ActivityRecognitionService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Log.d(TAG, "onTaskRemoved")
+        Log.d(TAG, "onTaskRemoved - ensuring wakeup alarm continues")
 
+        scheduleNextWakeup()
+    }
+
+    private fun setupWakeupAlarm() {
+        val intent = Intent(this, ActivityRecognitionService::class.java).apply {
+            action = ACTION_WAKEUP
+        }
+
+        wakeupIntent = PendingIntent.getService(
+            this,
+            WAKEUP_REQUEST_CODE,
+            intent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+        )
+
+        scheduleNextWakeup()
+    }
+
+    private fun scheduleNextWakeup() {
+        wakeupIntent?.let { pending ->
+            val triggerTime = SystemClock.elapsedRealtime() + WAKEUP_INTERVAL
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val canSchedule = alarmManager.canScheduleExactAlarms()
+                        if (!canSchedule) {
+                            Log.e(TAG, "Exact alarms cannot be set")
+                            alarmManager.setInexactRepeating(
+                                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                                triggerTime,
+                                WAKEUP_INTERVAL,
+                                pending
+                            )
+                            return
+                        }
+                    }
+
+                    // Para Doze mode, usar setExactAndAllowWhileIdle
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerTime,
+                        pending
+                    )
+                } catch (se: SecurityException) {
+                    Log.e(TAG, "SecurityException: ${se.message}")
+
+                    alarmManager.setInexactRepeating(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerTime,
+                        WAKEUP_INTERVAL,
+                        pending
+                    )
+                }
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerTime,
+                    pending
+                )
+            }
+
+            Log.d(TAG, "Next wakeup scheduled in $WAKEUP_INTERVAL ms")
+        }
+    }
+
+    private fun cancelWakeupAlarm() {
+        wakeupIntent?.let { pending ->
+            alarmManager.cancel(pending)
+            Log.d(TAG, "Wakeup alarm cancelled")
+        }
+    }
+
+    private fun handleWakeup() {
+        Log.d(TAG, "Wakeup alarm triggered")
+
+        acquireWakeLock()
+
+        try {
+            ensureRecognitionIsActive()
+
+            updateNotification()
+
+            // Loguear estado del sistema
+            logDeviceState()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during wakeup handling: ${e.message}")
+        } finally {
+            handler.postDelayed({
+                releaseWakeLock()
+            }, 5000)
+        }
+    }
+
+    private fun ensureRecognitionIsActive() {
+        if (useTransitionRecognition && !isTransitionRecognitionConfigured) {
+            Log.d(TAG, "Re-configuring transition recognition")
+            setupTransitionRecognition()
+            isTransitionRecognitionConfigured = true
+        }
+
+        if (useActivityRecognition && !isActivityRecognitionConfigured) {
+            Log.d(TAG, "Re-configuring activity recognition")
+            setupActivityRecognition()
+            isActivityRecognitionConfigured = true
+        }
+    }
+
+    private fun logDeviceState() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Log.d(TAG, "Device idle mode: ${powerManager.isDeviceIdleMode}")
+            Log.d(TAG, "Battery optimization ignored: ${isIgnoringBatteryOptimizations()}")
+        }
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            powerManager.isIgnoringBatteryOptimizations(packageName)
+        } else {
+            true
+        }
+    }
+
+    private fun cleanupRecognition() {
         activityIntent?.let { pending ->
             activityRecognitionClient.removeActivityUpdates(pending)
                 .addOnCompleteListener {
-                    Log.d(TAG, "Activity updates removed due to task removal")
+                    Log.d(TAG, "Activity updates removed")
                 }
         }
         transitionIntent?.let { pending ->
             activityRecognitionClient.removeActivityTransitionUpdates(pending)
                 .addOnCompleteListener {
-                    Log.d(TAG, "Transition updates removed due to task removal")
+                    Log.d(TAG, "Transition updates removed")
                 }
         }
-
-        stopHeartbeat()
-        releaseWakeLock()
-        stopSelf()
     }
 
     private fun createNotificationChannel() {
@@ -442,7 +526,6 @@ class ActivityRecognitionService : Service() {
 
     private fun acquireWakeLock() {
         if (wakeLock == null) {
-            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "ActivityRecognition:WakeLock"
@@ -451,7 +534,8 @@ class ActivityRecognitionService : Service() {
         }
 
         if (wakeLock?.isHeld == false) {
-            wakeLock?.acquire(30000L) // 30 seconds
+            wakeLock?.acquire(WAKELOCK_TIMEOUT)
+            Log.d(TAG, "WakeLock acquired")
         }
     }
 
@@ -460,6 +544,7 @@ class ActivityRecognitionService : Service() {
             wakeLock?.let {
                 if (it.isHeld) {
                     it.release()
+                    Log.d(TAG, "WakeLock released")
                 }
             }
         } catch (e: Exception) {

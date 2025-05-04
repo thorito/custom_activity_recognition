@@ -2,20 +2,19 @@ package com.aikotelematics.custom_activity_recognition
 
 import android.Manifest
 import android.app.Activity
-import android.content.ContentValues.TAG
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES
+import android.provider.Settings
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.aikotelematics.custom_activity_recognition.ActivityRecognitionService.Companion
-import io.flutter.plugin.common.EventChannel
-import android.util.Log
 import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
 import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
+import io.flutter.plugin.common.EventChannel
 import java.lang.ref.WeakReference
 
 class ActivityRecognitionManager(private val context: Context) : EventChannel.StreamHandler {
@@ -47,6 +46,15 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                     context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_DETECTOR)
         } catch (e: Exception) {
             false
+        }
+    }
+
+    fun checkAlarmPermission(): Boolean {
+        return if (SDK_INT >= VERSION_CODES.S) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true
         }
     }
 
@@ -215,22 +223,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                 callback(false)
             }
         }
-        else if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-            editor.putBoolean("has_requested_background_location", true)
-            editor.apply()
-            try {
-                ActivityCompat.requestPermissions(
-                    activity,
-                    arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-                    BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Error requesting background location: ${e.message}")
-                callback(false)
-            }
-        }
         else {
-            callback(true)
+            checkAndRequestAlarmPermission(activity, callback)
         }
     }
 
@@ -280,37 +274,13 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                     val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
 
                     if (allGranted) {
-                        if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-                            Log.d(TAG, "All basic permissions granted, requesting background location")
-                            val activity = activityReference?.get()
-                            if (activity != null) {
-                                try {
-                                    val sharedPrefs = context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
-                                    ActivityCompat.requestPermissions(
-                                        activity,
-                                        arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-                                        BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE
-                                    )
-
-                                    sharedPrefs.edit()
-                                        .putBoolean("has_requested_background_location", true)
-                                        .apply()
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Error requesting background location: ${e.message}")
-                                    permissionCallback?.invoke(false)
-                                    permissionCallback = null
-                                }
-                            } else {
-                                Log.e(TAG, "No activity reference available")
-                                permissionCallback?.invoke(false)
+                        activityReference?.get()?.let { activity ->
+                            checkAndRequestAlarmPermission(activity) { success ->
+                                permissionCallback?.invoke(success)
                                 permissionCallback = null
                             }
-                        } else {
-                            try {
-                                permissionCallback?.invoke(true)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Error invoking permission callback: ${e.message}")
-                            }
+                        } ?: run {
+                            permissionCallback?.invoke(false)
                             permissionCallback = null
                         }
                     } else {
@@ -390,9 +360,18 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                       callback: (Boolean) -> Unit) {
 
         if (!hasRequiredPermissions()) {
+            Log.d(TAG, "Has required permissions: false")
             callback(false)
             return
         }
+
+        if (!checkAlarmPermission()) {
+            Log.d(TAG, "Alarm permission: false")
+            callback(false)
+            return
+        }
+
+        Log.d(TAG, "Starting tracking")
 
         eventSinkInstance?.let {
             ActivityRecognitionReceiver.eventSink = it
@@ -443,5 +422,49 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         hasPermissions = hasPermissions && hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
 
         return hasPermissions
+    }
+
+    private fun checkAndRequestAlarmPermission(activity: Activity, callback: (Boolean) -> Unit) {
+        Log.d(TAG, "Checking alarm permission")
+        if (SDK_INT >= VERSION_CODES.S) {
+            if (!checkAlarmPermission()) {
+                try {
+                    val intent = Intent().apply {
+                        action = Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+                    }
+                    activity.startActivity(intent)
+                    callback(true)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error requesting alarm permission: ${e.message}")
+                    callback(false)
+                }
+            } else {
+                continueWithBackgroundLocation(activity, callback)
+            }
+        } else {
+            continueWithBackgroundLocation(activity, callback)
+        }
+    }
+
+    private fun continueWithBackgroundLocation(activity: Activity, callback: (Boolean) -> Unit) {
+        if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            val sharedPrefs =
+                context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
+            sharedPrefs.edit()
+                .putBoolean("has_requested_background_location", true)
+                .apply()
+            try {
+                ActivityCompat.requestPermissions(
+                    activity,
+                    arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                    BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error requesting background location: ${e.message}")
+                callback(false)
+            }
+        } else {
+            callback(true)
+        }
     }
 }

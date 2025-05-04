@@ -1,3 +1,7 @@
+## 0.0.23
+
+* Added alarm for DOZE Mode.
+
 ## 0.0.22
 
 * Added Heartbeat.
