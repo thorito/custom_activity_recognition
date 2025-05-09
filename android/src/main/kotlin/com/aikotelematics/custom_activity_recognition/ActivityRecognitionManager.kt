@@ -1,21 +1,36 @@
 package com.aikotelematics.custom_activity_recognition
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES
-import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
 import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
 import io.flutter.plugin.common.EventChannel
 import java.lang.ref.WeakReference
+import kotlin.Any
+import kotlin.Array
+import kotlin.Boolean
+import kotlin.Exception
+import kotlin.Int
+import kotlin.IntArray
+import kotlin.String
+import kotlin.Unit
+import kotlin.apply
+import kotlin.arrayOf
+import kotlin.invoke
+import kotlin.let
+import kotlin.run
+import kotlin.text.compareTo
+import kotlin.text.get
 
 class ActivityRecognitionManager(private val context: Context) : EventChannel.StreamHandler {
     companion object {
@@ -45,16 +60,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER) &&
                     context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_DETECTOR)
         } catch (e: Exception) {
+            Log.e(TAG, "Error isAvailable: ${e.message}")
             false
-        }
-    }
-
-    fun checkAlarmPermission(): Boolean {
-        return if (SDK_INT >= VERSION_CODES.S) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarmManager.canScheduleExactAlarms()
-        } else {
-            true
         }
     }
 
@@ -224,7 +231,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
             }
         }
         else {
-            checkAndRequestAlarmPermission(activity, callback)
+            continueWithBackgroundLocation(activity, callback)
         }
     }
 
@@ -251,55 +258,32 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                     }
 
                     if (hasCriticalDenied) {
-                        try {
-                            permissionCallback?.invoke(false)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error invoking permission callback: ${e.message}")
-                        }
+                        permissionCallback?.invoke(false)
                         permissionCallback = null
+                    } else {
+                        val allGranted =
+                            grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
 
-                        try {
-                            permissionStatusCallback?.let { callback ->
-                                activityReference?.get()?.let { activity ->
-                                    checkPermissionStatus(activity, callback)
+                        if (allGranted) {
+                            activityReference?.get()?.let { activity ->
+                                continueWithBackgroundLocation(activity) { finalResult ->
+                                    permissionCallback?.invoke(finalResult)
+                                    permissionCallback = null
                                 }
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error updating permission status: ${e.message}")
-                        }
-                        permissionStatusCallback = null
-                        return true
-                    }
-
-                    val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-
-                    if (allGranted) {
-                        activityReference?.get()?.let { activity ->
-                            checkAndRequestAlarmPermission(activity) { success ->
-                                permissionCallback?.invoke(success)
+                            } ?: run {
+                                permissionCallback?.invoke(false)
                                 permissionCallback = null
                             }
-                        } ?: run {
-                            permissionCallback?.invoke(false)
+                        } else {
+                            permissionCallback?.invoke(true)
                             permissionCallback = null
                         }
-                    } else {
-                        try {
-                            permissionCallback?.invoke(true)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error invoking permission callback: ${e.message}")
-                        }
-                        permissionCallback = null
                     }
 
-                    try {
-                        permissionStatusCallback?.let { callback ->
-                            activityReference?.get()?.let { activity ->
-                                checkPermissionStatus(activity, callback)
-                            }
+                    permissionStatusCallback?.let { callback ->
+                        activityReference?.get()?.let { activity ->
+                            checkPermissionStatus(activity, callback)
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error updating permission status: ${e.message}")
                     }
                     permissionStatusCallback = null
                 }
@@ -309,21 +293,13 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
 
                     Log.d(TAG, "Background location permission: ${if (granted) "GRANTED" else "DENIED"}")
 
-                    try {
-                        permissionCallback?.invoke(granted)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error invoking permission callback: ${e.message}")
-                    }
+                    permissionCallback?.invoke(granted)
                     permissionCallback = null
 
-                    try {
-                        permissionStatusCallback?.let { callback ->
-                            activityReference?.get()?.let { activity ->
-                                checkPermissionStatus(activity, callback)
-                            }
+                    permissionStatusCallback?.let { callback ->
+                        activityReference?.get()?.let { activity ->
+                            checkPermissionStatus(activity, callback)
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error updating permission status: ${e.message}")
                     }
                     permissionStatusCallback = null
                 }
@@ -331,23 +307,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error handling permission result: ${e.message}")
-            try {
-                permissionCallback?.invoke(false)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error invoking permission callback: ${e.message}")
-            }
+            permissionCallback?.invoke(false)
             permissionCallback = null
-
-            try {
-                permissionStatusCallback?.let { callback ->
-                    activityReference?.get()?.let { activity ->
-                        checkPermissionStatus(activity, callback)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating permission status: ${e.message}")
-            }
-            permissionStatusCallback = null
             return false
         }
     }
@@ -360,13 +321,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
                       callback: (Boolean) -> Unit) {
 
         if (!hasRequiredPermissions()) {
-            Log.d(TAG, "Has required permissions: false")
-            callback(false)
-            return
-        }
-
-        if (!checkAlarmPermission()) {
-            Log.d(TAG, "Alarm permission: false")
+            Log.d(TAG, "Missing required permissions")
             callback(false)
             return
         }
@@ -393,6 +348,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         callback(true)
     }
 
+    @SuppressLint("ImplicitSamInstance")
     fun stopTracking(callback: (Boolean) -> Unit) {
         context.stopService(Intent(context, ActivityRecognitionService::class.java))
         callback(true)
@@ -424,35 +380,13 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         return hasPermissions
     }
 
-    private fun checkAndRequestAlarmPermission(activity: Activity, callback: (Boolean) -> Unit) {
-        Log.d(TAG, "Checking alarm permission")
-        if (SDK_INT >= VERSION_CODES.S) {
-            if (!checkAlarmPermission()) {
-                try {
-                    val intent = Intent().apply {
-                        action = Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
-                    }
-                    activity.startActivity(intent)
-                    callback(true)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error requesting alarm permission: ${e.message}")
-                    callback(false)
-                }
-            } else {
-                continueWithBackgroundLocation(activity, callback)
-            }
-        } else {
-            continueWithBackgroundLocation(activity, callback)
-        }
-    }
-
     private fun continueWithBackgroundLocation(activity: Activity, callback: (Boolean) -> Unit) {
         if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
             val sharedPrefs =
                 context.getSharedPreferences("activity_recognition_prefs", Context.MODE_PRIVATE)
-            sharedPrefs.edit()
-                .putBoolean("has_requested_background_location", true)
-                .apply()
+            sharedPrefs.edit() {
+                putBoolean("has_requested_background_location", true)
+            }
             try {
                 ActivityCompat.requestPermissions(
                     activity,

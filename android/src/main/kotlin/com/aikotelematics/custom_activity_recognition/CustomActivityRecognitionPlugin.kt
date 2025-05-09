@@ -4,19 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.annotation.NonNull
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.DefaultLifecycleObserver
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
-import io.flutter.embedding.engine.plugins.lifecycle.HiddenLifecycleReference
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.BinaryMessenger
 
 /** CustomActivityRecognitionPlugin */
 class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -64,7 +59,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
             try {
               result.success(status)
             } catch (e: Exception) {
-              Log.e(TAG, "Error en checkPermissionStatus callback: ${e.message}")
+                Log.e(TAG, "Error on checkPermissionStatus callback: ${e.message}, status: $status")
             }
           }
         } ?: result.error("NO_ACTIVITY", "Activity is not available", null)
