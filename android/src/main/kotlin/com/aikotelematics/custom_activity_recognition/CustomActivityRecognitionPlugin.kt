@@ -21,7 +21,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
   private var activity: Activity? = null
   private lateinit var activityRecognitionManager: ActivityRecognitionManager
   private var binaryMessenger: BinaryMessenger? = null
-  private var pendingResult: Result? = null
+  private var pendingResult: MethodChannel.Result? = null
 
   companion object {
     private const val TAG = "CustomActivityRecognitionPlugin"
@@ -51,7 +51,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
     binaryMessenger = null
   }
 
-  override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+  override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {
     when (call.method) {
       "checkPermissionStatus" -> {
         activity?.let {
@@ -132,9 +132,9 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
         true
       } catch (e: Exception) {
         Log.e(TAG, "Error en handlePermissionResult: ${e.message}")
-        pendingResult?.let {
+        pendingResult?.let { result ->
           try {
-            it.error("PERMISSION_ERROR", "Error processing permission result", e.message)
+            result.error("PERMISSION_ERROR", "Error processing permission result", e.message)
           } catch (e2: Exception) {
             Log.e(TAG, "Error al enviar error al pendingResult: ${e2.message}")
           } finally {

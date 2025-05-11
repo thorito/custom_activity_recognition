@@ -1,3 +1,7 @@
+## 0.0.26
+
+* Fixed errors in Result type.
+
 ## 0.0.23
 
 * Added alarm for DOZE Mode.
