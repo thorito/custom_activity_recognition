@@ -53,7 +53,7 @@ class ActivityRecognitionService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var showNotification: Boolean = true
     private var useTransitionRecognition: Boolean = true
-    private var useActivityRecognition: Boolean = true
+    private var useActivityRecognition: Boolean = false
     private var activityIntent: PendingIntent? = null
     private var transitionIntent: PendingIntent? = null
     private var wakeupIntent: PendingIntent? = null

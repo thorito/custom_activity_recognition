@@ -30,13 +30,13 @@ class CustomActivityRecognition {
   /// Starts tracking user activity
   /// [useTransitionRecognition] and [useActivityRecognition] are optional
   /// useTransitionRecognition is true by default
-  /// useActivityRecognition is true by default
+  /// useActivityRecognition is false by default
   /// detectionIntervalMillis is 10000 by default
-  /// confidenceThreshold is 50 by default
+  /// confidenceThreshold is 70 by default
   Future<bool> startTracking({
     bool showNotification = true,
     bool useTransitionRecognition = true,
-    bool useActivityRecognition = true,
+    bool useActivityRecognition = false,
     int detectionIntervalMillis = defaultDetectionIntervalMillis,
     int confidenceThreshold = defaultConfidenceThreshold,
   }) async =>

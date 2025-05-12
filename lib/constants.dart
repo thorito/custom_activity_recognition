@@ -1,2 +1,2 @@
 const defaultDetectionIntervalMillis = 10000;
-const defaultConfidenceThreshold = 50;
+const defaultConfidenceThreshold = 70;

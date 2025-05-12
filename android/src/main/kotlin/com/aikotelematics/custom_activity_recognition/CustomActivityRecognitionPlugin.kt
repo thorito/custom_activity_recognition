@@ -26,7 +26,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
   companion object {
     private const val TAG = "CustomActivityRecognitionPlugin"
     const val DEFAULT_DETECTION_INTERVAL_MILLIS: Int = 10000
-    const val DEFAULT_CONFIDENCE_THRESHOLD: Int = 50
+    const val DEFAULT_CONFIDENCE_THRESHOLD: Int = 70
   }
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -136,7 +136,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
           try {
             result.error("PERMISSION_ERROR", "Error processing permission result", e.message)
           } catch (e2: Exception) {
-            Log.e(TAG, "Error al enviar error al pendingResult: ${e2.message}")
+            Log.e(TAG, "Error send pendingResult: ${e2.message}")
           } finally {
             pendingResult = null
           }
