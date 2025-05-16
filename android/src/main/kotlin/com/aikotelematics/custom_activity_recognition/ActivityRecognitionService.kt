@@ -25,28 +25,83 @@ class ActivityRecognitionService : Service() {
         private const val ACTIVITY_REQUEST_CODE = 200
         private const val TRANSITION_REQUEST_CODE = 201
         private const val WAKEUP_REQUEST_CODE = 202
+        private const val HEALTH_CHECK_REQUEST_CODE = 203
 
         private const val NOTIFICATION_ID = 7502
         private const val ACTION_WAKEUP = "com.aikotelematics.WAKEUP_ACTION"
+        private const val ACTION_HEALTH_CHECK = "com.aikotelematics.HEALTH_CHECK_ACTION"
         private const val CHANNEL_ID = "activity_recognition_channel"
 
         private const val SILENT_CHANNEL_ID = "activity_recognition_silent_channel"
-        private const val WAKEUP_INTERVAL = 10 * 60 * 1000L // 10 minutes
+        private const val WAKEUP_INTERVAL = 5 * 60 * 1000L // 5 minutes
+        private const val WAKELOCK_TIMEOUT = 5 * 60 * 1000L // 5 minutes
+        private const val HEALTH_CHECK_INTERVAL = 60 * 60 * 1000L // 1 hour
 
-        private const val WAKELOCK_TIMEOUT = 2 * 60 * 1000L // 2 minutes
         private var isServiceRunning = false
         private var isTransitionRecognitionConfigured = false
-
+        private var healthCheckIntent: PendingIntent? = null
         private var isActivityRecognitionConfigured = false
         var detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS
 
         var confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD
         fun isRunning() = isServiceRunning
+
+        fun scheduleNextHealthCheck(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, ActivityRecognitionHealthReceiver::class.java).apply {
+                action = ACTION_HEALTH_CHECK
+            }
+
+            healthCheckIntent?.let { pending ->
+                alarmManager.cancel(pending)
+                Log.d(TAG, "Health check alarm cancelled")
+            }
+
+            healthCheckIntent = PendingIntent.getBroadcast(
+                context,
+                HEALTH_CHECK_REQUEST_CODE,
+                intent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+            )
+
+            healthCheckIntent?.let { pending ->
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    try {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                            SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
+                            pending
+                        )
+                        Log.d(TAG, "Next health check scheduled in $HEALTH_CHECK_INTERVAL ms")
+                    } catch (e: SecurityException) {
+                        Log.e(TAG, "SecurityException scheduling health check: ${e.message}")
+                        alarmManager.setInexactRepeating(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                            SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
+                            HEALTH_CHECK_INTERVAL,
+                            pending
+                        )
+                    }
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
+                        pending
+                    )
+                    Log.d(TAG, "Next health check scheduled in $HEALTH_CHECK_INTERVAL ms (pre-M)")
+                }
+            }
+        }
     }
 
+    private lateinit var alarmManager: AlarmManager
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private lateinit var notificationManager: NotificationManager
-    private lateinit var alarmManager: AlarmManager
     private lateinit var powerManager: PowerManager
     private lateinit var handler: android.os.Handler
 
@@ -74,6 +129,7 @@ class ActivityRecognitionService : Service() {
 
         createNotificationChannel()
         setupWakeupAlarm()
+        setupHealthCheck()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -93,6 +149,7 @@ class ActivityRecognitionService : Service() {
         if (intent?.action == ACTION_WAKEUP) {
             handleWakeup()
             scheduleNextWakeup()
+            scheduleNextHealthCheck(this)
             return START_STICKY
         }
 
@@ -166,6 +223,7 @@ class ActivityRecognitionService : Service() {
 
     override fun onDestroy() {
 
+        cancelCheckHealthAlarm()
         cancelWakeupAlarm()
         cleanupRecognition()
 
@@ -189,6 +247,7 @@ class ActivityRecognitionService : Service() {
         Log.d(TAG, "onTaskRemoved - ensuring wakeup alarm continues")
 
         scheduleNextWakeup()
+        scheduleNextHealthCheck(this)
     }
 
     private fun setupWakeupAlarm() {
@@ -230,7 +289,6 @@ class ActivityRecognitionService : Service() {
                         }
                     }
 
-                    // Para Doze mode, usar setExactAndAllowWhileIdle
                     alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.ELAPSED_REALTIME_WAKEUP,
                         triggerTime,
@@ -262,6 +320,13 @@ class ActivityRecognitionService : Service() {
         wakeupIntent?.let { pending ->
             alarmManager.cancel(pending)
             Log.d(TAG, "Wakeup alarm cancelled")
+        }
+    }
+
+    private fun cancelCheckHealthAlarm() {
+        healthCheckIntent?.let { pending ->
+            alarmManager.cancel(pending)
+            Log.d(TAG, "Health check alarm cancelled")
         }
     }
 
@@ -550,5 +615,23 @@ class ActivityRecognitionService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing WakeLock: ${e.message}")
         }
+    }
+
+    private fun setupHealthCheck() {
+        val intent = Intent(this, ActivityRecognitionHealthReceiver::class.java)
+        intent.action = ACTION_HEALTH_CHECK
+
+        healthCheckIntent = PendingIntent.getBroadcast(
+            this,
+            HEALTH_CHECK_REQUEST_CODE,
+            intent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+        )
+
+        scheduleNextHealthCheck(this)
     }
 }

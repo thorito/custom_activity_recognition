@@ -1,6 +1,6 @@
 name: custom_activity_recognition
 description: "This plugin is used to recognize user activity transition on Android and iOS platforms."
-version: 0.0.26+1
+version: 0.0.26+2
 
 homepage: https://github.com/thorito/custom_activity_recognition
 issue_tracker: https://github.com/thorito/custom_activity_recognition/issues?q=is%3Aissue+is%3Aopen
