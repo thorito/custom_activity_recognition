@@ -4,6 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.annotation.NonNull
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Contants.TAG
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -22,12 +25,6 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
   private lateinit var activityRecognitionManager: ActivityRecognitionManager
   private var binaryMessenger: BinaryMessenger? = null
   private var pendingResult: MethodChannel.Result? = null
-
-  companion object {
-    private const val TAG = "CustomActivityRecognitionPlugin"
-    const val DEFAULT_DETECTION_INTERVAL_MILLIS: Int = 10000
-    const val DEFAULT_CONFIDENCE_THRESHOLD: Int = 50
-  }
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     context = flutterPluginBinding.applicationContext

@@ -11,8 +11,11 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
-import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Contants.ACTION_WAKEUP
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Contants.TAG
+import com.aikotelematics.custom_activity_recognition.Contants.UPDATE_ACTIVITY
 import com.google.android.gms.location.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -21,23 +24,21 @@ import java.util.Locale
 class ActivityRecognitionService : Service() {
 
     companion object {
-        private const val TAG = "ActivityRecognitionService"
         private const val ACTIVITY_REQUEST_CODE = 200
         private const val TRANSITION_REQUEST_CODE = 201
         private const val WAKEUP_REQUEST_CODE = 202
         private const val HEALTH_CHECK_REQUEST_CODE = 203
 
         private const val NOTIFICATION_ID = 7502
-        private const val ACTION_WAKEUP = "com.aikotelematics.WAKEUP_ACTION"
         private const val ACTION_HEALTH_CHECK = "com.aikotelematics.HEALTH_CHECK_ACTION"
         private const val CHANNEL_ID = "activity_recognition_channel"
-
         private const val SILENT_CHANNEL_ID = "activity_recognition_silent_channel"
+
         private const val WAKEUP_INTERVAL = 5 * 60 * 1000L // 5 minutes
         private const val WAKELOCK_TIMEOUT = 5 * 60 * 1000L // 5 minutes
-        private const val HEALTH_CHECK_INTERVAL = 60 * 60 * 1000L // 1 hour
-
+        private const val HEALTH_CHECK_INTERVAL = 30 * 60 * 1000L // 30 minutes
         private var isServiceRunning = false
+
         private var isTransitionRecognitionConfigured = false
         private var healthCheckIntent: PendingIntent? = null
         private var isActivityRecognitionConfigured = false
@@ -195,7 +196,7 @@ class ActivityRecognitionService : Service() {
         }
 
         when (intent?.action) {
-            "UPDATE_ACTIVITY" -> {
+            UPDATE_ACTIVITY -> {
                 var changes = false
 
                 val activityExtra = intent.getStringExtra("activity") ?: "UNKNOWN"
@@ -525,13 +526,6 @@ class ActivityRecognitionService : Service() {
                 ActivityTransition.Builder()
                     .setActivityType(activityType)
                     .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-                    .build()
-            )
-
-            transitions.add(
-                ActivityTransition.Builder()
-                    .setActivityType(activityType)
-                    .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
                     .build()
             )
         }

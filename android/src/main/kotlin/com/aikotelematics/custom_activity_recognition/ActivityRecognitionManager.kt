@@ -12,29 +12,14 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_CONFIDENCE_THRESHOLD
-import com.aikotelematics.custom_activity_recognition.CustomActivityRecognitionPlugin.Companion.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Contants.TAG
 import io.flutter.plugin.common.EventChannel
 import java.lang.ref.WeakReference
-import kotlin.Any
-import kotlin.Array
-import kotlin.Boolean
-import kotlin.Exception
-import kotlin.Int
-import kotlin.IntArray
-import kotlin.String
-import kotlin.Unit
-import kotlin.apply
-import kotlin.arrayOf
-import kotlin.invoke
-import kotlin.let
-import kotlin.run
-import kotlin.text.compareTo
-import kotlin.text.get
 
 class ActivityRecognitionManager(private val context: Context) : EventChannel.StreamHandler {
     companion object {
-        private const val TAG = "ActivityRecognitionManager"
         private const val PERMISSION_REQUEST_CODE = 100
         private const val LOCATION_PERMISSION_REQUEST_CODE = 101
         private const val BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 102

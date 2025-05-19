@@ -7,10 +7,10 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import com.aikotelematics.custom_activity_recognition.ActivityRecognitionService.Companion.scheduleNextHealthCheck
+import com.aikotelematics.custom_activity_recognition.Contants.TAG
 
 class ActivityRecognitionHealthReceiver : BroadcastReceiver() {
     companion object {
-        private const val TAG = "ActivityRecognitionHealthReceiver"
         private const val ACTION_HEALTH_CHECK = "com.aikotelematics.HEALTH_CHECK_ACTION"
         private const val WAKELOCK_TIMEOUT = 30 * 1000L
     }

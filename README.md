@@ -55,7 +55,7 @@ If you need to detect activity switching only in the foreground, I recommend:
     useTransitionRecognition: true,
 useActivityRecognition: true,
     detectionIntervalMillis: 10000,
-    confidenceThreshold: 50,
+confidenceThreshold: 60,
   );
 ```
 

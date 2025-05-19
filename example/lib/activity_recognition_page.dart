@@ -22,7 +22,7 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
       CustomActivityPermissionStatus.notDetermined;
   bool _showNotification = true;
   bool _useTransitionRecognition = true;
-  bool _useActivityRecognition = false;
+  bool _useActivityRecognition = true;
   bool _isRequestingPermissions = false;
   bool _isTracking = false;
   String _currentActivity = "UNKNOWN";
