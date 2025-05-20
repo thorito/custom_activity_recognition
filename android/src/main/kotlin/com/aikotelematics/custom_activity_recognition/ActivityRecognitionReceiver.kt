@@ -55,9 +55,9 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
                             "$activityType ($transitionType)"
                 )
 
-                if (lastActivityType == null) {
-                    lastActivityType = activityType;
+                if (activityType != lastActivityType || lastActivityType == null) {
                     sendActivityUpdate(context, activityType, timestamp)
+                    lastActivityType = activityType;
                 }
             }
         }
