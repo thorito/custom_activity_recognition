@@ -300,7 +300,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
 
     fun startTracking(showNotification: Boolean = true,
                       useTransitionRecognition: Boolean = true,
-                      useActivityRecognition: Boolean = false,
+                      useActivityRecognition: Boolean = true,
                       detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS,
                       confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD,
                       callback: (Boolean) -> Unit) {
