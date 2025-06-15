@@ -127,8 +127,8 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
         val manager = activityRecognitionManager
         if (manager != null) {
           val showNotification = call.argument<Boolean>("showNotification") ?: true
-          val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: false
-          val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: true
+          val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: true
+          val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: false
           val detectionIntervalMillis =
             call.argument<Int>("detectionIntervalMillis") ?: DEFAULT_DETECTION_INTERVAL_MILLIS
           val confidenceThreshold =

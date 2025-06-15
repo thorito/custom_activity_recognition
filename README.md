@@ -48,14 +48,14 @@ If you need to detect activity switching only in the foreground, I recommend:
 
 ```dart
   // CustomActivityRecognition.instance.startTracking() 
-  // useTransitionRecognition = true, useActivityRecognition = true
+  // useTransitionRecognition = true, useActivityRecognition = false
 
   CustomActivityRecognition.instance.startTracking(
     showNotification: true,
     useTransitionRecognition: true,
-useActivityRecognition: true,
+    useActivityRecognition: false,
     detectionIntervalMillis: 10000,
-confidenceThreshold: 60,
+    confidenceThreshold: 60,
   );
 ```
 
