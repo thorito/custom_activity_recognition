@@ -3,8 +3,11 @@ package com.aikotelematics.custom_activity_recognition
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES
@@ -12,9 +15,12 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
-import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
-import com.aikotelematics.custom_activity_recognition.Contants.TAG
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.aikotelematics.custom_activity_recognition.ActivityRecognitionReceiver.Companion.eventSink
+import com.aikotelematics.custom_activity_recognition.Constants.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.Constants.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Constants.TAG
+import com.google.android.gms.location.ActivityRecognition
 import io.flutter.plugin.common.EventChannel
 import java.lang.ref.WeakReference
 
@@ -30,9 +36,130 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
 
     private var activityReference: WeakReference<Activity>? = null
 
+    private val localBroadcastManager: LocalBroadcastManager by lazy {
+        LocalBroadcastManager.getInstance(context)
+    }
+
+    private val activityUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "ACTIVITY_UPDATE") {
+                val activityType = intent.getStringExtra("activity") ?: return
+                val timestamp = intent.getLongExtra("timestamp", 0)
+
+                eventSink?.success(
+                    mapOf(
+                        "activity" to activityType,
+                        "timestamp" to timestamp
+                    )
+                ) ?: Log.d(TAG, "eventSink is null, queuing update")
+            }
+        }
+    }
+
+    private var isTracking = false
+    private var lastKnownActivity: String? = null
+
+    /**
+     * Updates the last known activity type
+     * @param activityType The new activity type to set as last known
+     */
+    fun updateLastKnownActivity(activityType: String) {
+        if (activityType != "UNKNOWN") {
+            lastKnownActivity = activityType
+            Log.d(TAG, "Updated last known activity to: $activityType")
+        }
+    }
+
+    fun getCurrentActivity(callback: (String) -> Unit) {
+        if (!isTracking) {
+            Log.d(TAG, "getCurrentActivity called but tracking is not active")
+            lastKnownActivity?.let { callback(it) } ?: callback("UNKNOWN")
+            return
+        }
+
+        try {
+            val requestCode = System.currentTimeMillis().toInt()
+            val intent = Intent(context, ActivityRecognitionReceiver::class.java).apply {
+                action = "GET_INITIAL_STATE"
+                putExtra("isInitialState", true)
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Request a single update with a short delay to get the most recent state
+            val task = ActivityRecognition.getClient(context).requestActivityUpdates(
+                1000, // 1 second delay to get the most recent state
+                pendingIntent
+            )
+
+            task.addOnSuccessListener {
+                Log.d(TAG, "Successfully requested initial activity update")
+            }
+
+            task.addOnFailureListener { e ->
+                Log.e(TAG, "Error getting current activity: ${e.localizedMessage}")
+                lastKnownActivity?.let { callback(it) } ?: callback("UNKNOWN")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in getCurrentActivity: ${e.message}", e)
+            callback("UNKNOWN")
+        }
+    }
+
+    fun startListening() {
+        try {
+            if (isTracking) {
+                Log.d(TAG, "Already listening for activity updates")
+                return
+            }
+
+            isTracking = true
+            val filter = IntentFilter("ACTIVITY_UPDATE")
+            // Ensure the receiver is not already registered
+            try {
+                localBroadcastManager.unregisterReceiver(activityUpdateReceiver)
+            } catch (e: Exception) {
+                // Receiver was not registered, ignore
+            }
+            localBroadcastManager.registerReceiver(activityUpdateReceiver, filter)
+            Log.d(TAG, "Started listening for activity updates")
+        } catch (e: Exception) {
+            isTracking = false
+            Log.e(TAG, "Error starting to listen for activity updates", e)
+        }
+    }
+
+    fun stopListening() {
+        try {
+            localBroadcastManager.unregisterReceiver(activityUpdateReceiver)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering receiver", e)
+        }
+    }
+
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+        Log.d(TAG, "onListen called")
         eventSinkInstance = events
         ActivityRecognitionReceiver.eventSink = events
+
+        // Get current activity state when starting to listen
+        getCurrentActivity { currentActivity ->
+            events.success(
+                mapOf(
+                    "activity" to currentActivity,
+                    "timestamp" to System.currentTimeMillis(),
+                    "isInitialState" to true
+                )
+            )
+        }
+
+        startListening()
     }
 
     override fun onCancel(arguments: Any?) {

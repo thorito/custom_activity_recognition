@@ -54,6 +54,7 @@ android {
         implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
         implementation 'androidx.core:core-ktx:1.16.0'
         implementation 'com.google.android.gms:play-services-location:21.3.0'
+        implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
 
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.12.0")

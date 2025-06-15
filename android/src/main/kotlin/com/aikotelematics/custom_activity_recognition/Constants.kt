@@ -1,6 +1,6 @@
 package com.aikotelematics.custom_activity_recognition
 
-object Contants {
+object Constants {
     const val TAG = "CustomActivityRecognition"
 
     const val UPDATE_ACTIVITY = "com.aikotelematics.UPDATE_ACTIVITY"

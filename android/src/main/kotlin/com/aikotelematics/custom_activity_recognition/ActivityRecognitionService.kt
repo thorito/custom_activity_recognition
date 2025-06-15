@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -11,17 +12,19 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.aikotelematics.custom_activity_recognition.Contants.ACTION_WAKEUP
-import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
-import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
-import com.aikotelematics.custom_activity_recognition.Contants.TAG
-import com.aikotelematics.custom_activity_recognition.Contants.UPDATE_ACTIVITY
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.aikotelematics.custom_activity_recognition.Constants.ACTION_WAKEUP
+import com.aikotelematics.custom_activity_recognition.Constants.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.Constants.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Constants.TAG
+import com.aikotelematics.custom_activity_recognition.Constants.UPDATE_ACTIVITY
 import com.google.android.gms.location.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class ActivityRecognitionService : Service() {
+    private var activityReceiver: ActivityRecognitionReceiver? = null
 
     companion object {
         private const val ACTIVITY_REQUEST_CODE = 200
@@ -37,18 +40,22 @@ class ActivityRecognitionService : Service() {
         private const val WAKEUP_INTERVAL = 5 * 60 * 1000L // 5 minutes
         private const val WAKELOCK_TIMEOUT = 5 * 60 * 1000L // 5 minutes
         private const val HEALTH_CHECK_INTERVAL = 30 * 60 * 1000L // 30 minutes
-        private var isServiceRunning = false
 
-        private var isTransitionRecognitionConfigured = false
+        @Volatile
+        var isServiceRunning = false
+        @Volatile
+        var isTransitionRecognitionConfigured = false
+        @Volatile
+        var isActivityRecognitionConfigured = false
+        
         private var healthCheckIntent: PendingIntent? = null
-        private var isActivityRecognitionConfigured = false
         var detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS
 
         var confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD
         fun isRunning() = isServiceRunning
 
         fun scheduleNextHealthCheck(context: Context) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val alarmManager = context.getSystemService(ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, ActivityRecognitionHealthReceiver::class.java).apply {
                 action = ACTION_HEALTH_CHECK
             }
@@ -118,29 +125,67 @@ class ActivityRecognitionService : Service() {
 
     @SuppressLint("InlinedApi")
     override fun onCreate() {
-        super.onCreate()
-        activityRecognitionClient = ActivityRecognition.getClient(this)
-        isServiceRunning = true
+        try {
+            super.onCreate()
+            Log.d(TAG, "Service onCreate called")
 
-        notificationManager =
-            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        handler = android.os.Handler(android.os.Looper.getMainLooper())
+            // Initialize activity recognition client
+            activityRecognitionClient = ActivityRecognition.getClient(applicationContext)
+            isServiceRunning = true
 
-        createNotificationChannel()
-        setupWakeupAlarm()
-        setupHealthCheck()
+            // Initialize system services
+            notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            handler = android.os.Handler(android.os.Looper.getMainLooper())
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                createNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, createNotification())
+            // Set up notification channels
+            createNotificationChannel()
+
+            // Start in foreground with notification
+            val notification = createNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+
+            Log.d(TAG, "Service started in foreground")
+
+            // Set up verification alarms
+            setupWakeupAlarm()
+            setupHealthCheck()
+
+            // Acquire wake lock to keep device awake
+            acquireWakeLock()
+
+            // Register activity receiver
+            activityReceiver = ActivityRecognitionReceiver()
+            val filter = IntentFilter("ACTIVITY_UPDATE")
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(activityReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                } else {
+                    registerReceiver(activityReceiver, filter)
+                }
+                Log.d(TAG, "Activity receiver registered successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error registering activity receiver: ${e.message}", e)
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in Service onCreate: ${e.message}", e)
+            // Try to recover
+            try {
+                stopSelf()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping service: ${e.message}")
+            }
         }
     }
 
@@ -223,17 +268,44 @@ class ActivityRecognitionService : Service() {
     }
 
     override fun onDestroy() {
+        try {
+            Log.d(TAG, "Service onDestroy called")
+            isServiceRunning = false
 
-        cancelCheckHealthAlarm()
-        cancelWakeupAlarm()
-        cleanupRecognition()
+            // Cancel all alarms
+            cancelWakeupAlarm()
+            cancelCheckHealthAlarm()
 
-        notificationManager.cancel(NOTIFICATION_ID)
+            // Clean up activity recognition
+            cleanupRecognition()
 
-        releaseWakeLock()
-        handler.removeCallbacksAndMessages(null)
+            // Release WakeLock if active
+            releaseWakeLock()
 
-        isServiceRunning = false
+            // Cancel notification
+            notificationManager.cancel(NOTIFICATION_ID)
+
+            // Unregister activity receiver
+            try {
+                activityReceiver?.let { receiver ->
+                    unregisterReceiver(receiver)
+                    Log.d(TAG, "Activity receiver unregistered successfully")
+                }
+                activityReceiver = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering activity receiver: ${e.message}", e)
+            }
+
+            Log.d(TAG, "Service cleanup completed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onDestroy: ${e.message}", e)
+        } finally {
+            try {
+                super.onDestroy()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in super.onDestroy(): ${e.message}", e)
+            }
+        }
         isActivityRecognitionConfigured = false
         isTransitionRecognitionConfigured = false
 
@@ -244,11 +316,19 @@ class ActivityRecognitionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        super.onTaskRemoved(rootIntent)
-        Log.d(TAG, "onTaskRemoved - ensuring wakeup alarm continues")
-
         scheduleNextWakeup()
         scheduleNextHealthCheck(this)
+
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "onTaskRemoved - ensuring wakeup alarm continues")
+    }
+
+    private fun sendActivityUpdate(activityType: String, timestamp: Long) {
+        val intent = Intent("ACTIVITY_UPDATE").apply {
+            putExtra("activity", activityType)
+            putExtra("timestamp", timestamp)
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 
     private fun setupWakeupAlarm() {
@@ -272,7 +352,7 @@ class ActivityRecognitionService : Service() {
 
     private fun scheduleNextWakeup() {
         wakeupIntent?.let { pending ->
-            val triggerTime = SystemClock.elapsedRealtime() + WAKEUP_INTERVAL
+            val triggerTime = System.currentTimeMillis() + WAKEUP_INTERVAL
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 try {
@@ -341,7 +421,7 @@ class ActivityRecognitionService : Service() {
 
             updateNotification()
 
-            // Loguear estado del sistema
+            // Log system state
             logDeviceState()
 
         } catch (e: Exception) {
@@ -383,17 +463,59 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun cleanupRecognition() {
-        activityIntent?.let { pending ->
-            activityRecognitionClient.removeActivityUpdates(pending)
-                .addOnCompleteListener {
-                    Log.d(TAG, "Activity updates removed")
+        try {
+            Log.d(TAG, "Cleaning up recognition services")
+
+            // Clean up activity updates
+            activityIntent?.let { pending ->
+                try {
+                    activityRecognitionClient.removeActivityUpdates(pending)
+                        .addOnSuccessListener {
+                            Log.d(TAG, "Activity updates removed successfully")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e(TAG, "Error removing activity updates: ${e.message}")
+                        }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception in removeActivityUpdates: ${e.message}")
+                } finally {
+                    activityIntent = null
                 }
-        }
-        transitionIntent?.let { pending ->
-            activityRecognitionClient.removeActivityTransitionUpdates(pending)
-                .addOnCompleteListener {
-                    Log.d(TAG, "Transition updates removed")
+            }
+
+            // Clean up transition updates
+            transitionIntent?.let { pending ->
+                try {
+                    activityRecognitionClient.removeActivityTransitionUpdates(pending)
+                        .addOnSuccessListener {
+                            Log.d(TAG, "Transition updates removed successfully")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e(TAG, "Error removing transition updates: ${e.message}")
+                        }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception in removeActivityTransitionUpdates: ${e.message}")
+                } finally {
+                    transitionIntent = null
                 }
+            }
+
+            // Clean up wakeup intent
+            wakeupIntent?.cancel()
+            wakeupIntent = null
+
+            // Clean up update receiver
+            try {
+                unregisterReceiver(ActivityRecognitionReceiver())
+                Log.d(TAG, "Activity recognition receiver unregistered")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering receiver: ${e.message}")
+            }
+
+            Log.d(TAG, "Cleanup completed")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in cleanupRecognition: ${e.message}", e)
         }
     }
 
@@ -456,16 +578,18 @@ class ActivityRecognitionService : Service() {
             builder.setContentTitle("Activity Recognition")
                 .setContentText("$currentActivity$timestampFormatted")
                 .setSmallIcon(R.drawable.ic_notification)
-                .setPriority(NotificationCompat.PRIORITY_MIN)
-                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setOngoing(true)
                 .setAutoCancel(false)
         } else {
             builder.setContentTitle("")
                 .setContentText("")
                 .setSmallIcon(R.drawable.ic_notification)
-                .setPriority(NotificationCompat.PRIORITY_MIN)
-                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setOngoing(true)
                 .setSilent(true)
         }
@@ -483,63 +607,95 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun setupTransitionRecognition() {
-        Log.d(TAG, "setupTransitionRecognition")
-        val intent = Intent(this, ActivityRecognitionReceiver::class.java)
-        intent.action = "com.aikotelematics.activity_transition"
+        try {
+            Log.d(TAG, "Setting up transition recognition")
 
-        transitionIntent = PendingIntent.getBroadcast(
-            this,
-            TRANSITION_REQUEST_CODE,
-            intent,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Create intent for transition receiver
+            val intent = Intent(applicationContext, ActivityRecognitionReceiver::class.java).apply {
+                action = "com.aikotelematics.activity_transition"
+                `package` = applicationContext.packageName
+            }
+
+            // Create PendingIntent
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             } else {
                 PendingIntent.FLAG_UPDATE_CURRENT
             }
-        )
 
-        transitionIntent?.let {
-            activityRecognitionClient.removeActivityTransitionUpdates(it)
-                .addOnCompleteListener {
-                    Log.d(TAG, "removeActivityTransitionUpdates success")
+            val pendingIntent = PendingIntent.getBroadcast(
+                applicationContext,
+                TRANSITION_REQUEST_CODE,
+                intent,
+                flags
+            )
+
+            // Update intent reference
+            transitionIntent = pendingIntent
+
+            // First try to remove any previous updates
+            activityRecognitionClient.removeActivityTransitionUpdates(pendingIntent)
+                .addOnSuccessListener {
+                    Log.d(TAG, "Previous transition updates removed successfully")
+                    initTransitionRequest()
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Error removing previous transition updates: ${e.message}")
+                    // Try to initialize anyway
                     initTransitionRequest()
                 }
 
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting up transition recognition: ${e.message}", e)
         }
     }
 
     private fun initTransitionRequest() {
-        acquireWakeLock()
-        val transitions = mutableListOf<ActivityTransition>()
+        try {
+            val intent = transitionIntent
+            if (intent == null) {
+                Log.e(TAG, "transitionIntent is null, cannot initialize transition request")
+                releaseWakeLock()
+                return
+            }
 
-        val activityTypes = listOf(
-            DetectedActivity.IN_VEHICLE,
-            DetectedActivity.ON_BICYCLE,
-            DetectedActivity.RUNNING,
-            DetectedActivity.ON_FOOT,
-            DetectedActivity.WALKING,
-            DetectedActivity.STILL
-        )
+            acquireWakeLock()
+            val transitions = mutableListOf<ActivityTransition>()
 
-        for (activityType in activityTypes) {
-            transitions.add(
-                ActivityTransition.Builder()
-                    .setActivityType(activityType)
-                    .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-                    .build()
+            val activityTypes = listOf(
+                DetectedActivity.IN_VEHICLE,
+                DetectedActivity.ON_BICYCLE,
+                DetectedActivity.RUNNING,
+                DetectedActivity.ON_FOOT,
+                DetectedActivity.WALKING,
+                DetectedActivity.STILL
             )
-        }
 
-        val request = ActivityTransitionRequest(transitions)
-        activityRecognitionClient.requestActivityTransitionUpdates(request, transitionIntent!!)
-            .addOnSuccessListener {
-                Log.d(TAG, "requestActivityTransitionUpdates success")
-                releaseWakeLock()
+            for (activityType in activityTypes) {
+                transitions.add(
+                    ActivityTransition.Builder()
+                        .setActivityType(activityType)
+                        .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                        .build()
+                )
             }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Error requestActivityTransitionUpdates: ${e.message}")
-                releaseWakeLock()
-            }
+
+            Log.d(TAG, "Initializing activity transition updates")
+            val request = ActivityTransitionRequest(transitions)
+
+            activityRecognitionClient.requestActivityTransitionUpdates(request, intent)
+                .addOnSuccessListener {
+                    Log.d(TAG, "Activity transition updates initialized successfully")
+                    releaseWakeLock()
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Error initializing activity transition updates: ${e.message}")
+                    releaseWakeLock()
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in initTransitionRequest: ${e.message}", e)
+            releaseWakeLock()
+        }
     }
 
     private fun setupActivityRecognition() {
@@ -584,17 +740,13 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun acquireWakeLock() {
-        if (wakeLock == null) {
+        if (wakeLock?.isHeld != true) {
             wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
-                "ActivityRecognition:WakeLock"
-            )
-            wakeLock?.setReferenceCounted(false)
-        }
-
-        if (wakeLock?.isHeld == false) {
-            wakeLock?.acquire(WAKELOCK_TIMEOUT)
-            Log.d(TAG, "WakeLock acquired")
+                "CustomActivityRecognition::WakeLock"
+            ).apply {
+                acquire(WAKELOCK_TIMEOUT)
+            }
         }
     }
 

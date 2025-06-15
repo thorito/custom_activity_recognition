@@ -7,7 +7,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import com.aikotelematics.custom_activity_recognition.ActivityRecognitionService.Companion.scheduleNextHealthCheck
-import com.aikotelematics.custom_activity_recognition.Contants.TAG
+import com.aikotelematics.custom_activity_recognition.Constants.TAG
 
 class ActivityRecognitionHealthReceiver : BroadcastReceiver() {
     companion object {
