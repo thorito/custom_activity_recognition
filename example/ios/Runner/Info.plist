@@ -51,5 +51,9 @@
     <array>
         <string>fetch</string>
     </array>
+    <key>io.flutter.embedding.ios.EnableImpeller</key>
+    <true/>
+    <key>FLTEnableImpeller</key>
+    <true/>
 </dict>
 </plist>
