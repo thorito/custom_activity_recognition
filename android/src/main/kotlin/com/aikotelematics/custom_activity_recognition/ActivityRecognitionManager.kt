@@ -462,8 +462,9 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
 
     @SuppressLint("ImplicitSamInstance")
     fun stopTracking(callback: (Boolean) -> Unit) {
-        context.stopService(Intent(context, ActivityRecognitionService::class.java))
-        callback(true)
+        val intent = Intent(context, ActivityRecognitionService::class.java)
+        val stopped = context.stopService(intent)
+        callback(stopped)
     }
 
     private fun hasPermission(permission: String): Boolean {

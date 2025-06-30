@@ -282,9 +282,6 @@ class ActivityRecognitionService : Service() {
             // Release WakeLock if active
             releaseWakeLock()
 
-            // Cancel notification
-            notificationManager.cancel(NOTIFICATION_ID)
-
             // Unregister activity receiver
             try {
                 activityReceiver?.let { receiver ->
@@ -301,6 +298,8 @@ class ActivityRecognitionService : Service() {
             Log.e(TAG, "Error in onDestroy: ${e.message}", e)
         } finally {
             try {
+                // Cancel notification
+                notificationManager.cancel(NOTIFICATION_ID)
                 super.onDestroy()
             } catch (e: Exception) {
                 Log.e(TAG, "Error in super.onDestroy(): ${e.message}", e)
@@ -572,25 +571,23 @@ class ActivityRecognitionService : Service() {
 
         val builder = NotificationCompat.Builder(this, channelId)
             .setContentIntent(pendingIntent)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+
 
         if (showNotification) {
             builder.setContentTitle("Activity Recognition")
                 .setContentText("$currentActivity$timestampFormatted")
-                .setSmallIcon(R.drawable.ic_notification)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setOngoing(true)
-                .setAutoCancel(false)
         } else {
-            builder.setContentTitle("")
+            builder.setContentTitle("Activity Recognition")
                 .setContentText("")
-                .setSmallIcon(R.drawable.ic_notification)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
                 .setSilent(true)
         }
 
