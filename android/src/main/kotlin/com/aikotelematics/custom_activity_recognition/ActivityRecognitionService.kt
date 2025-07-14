@@ -32,7 +32,7 @@ class ActivityRecognitionService : Service() {
         private const val WAKEUP_REQUEST_CODE = 202
         private const val HEALTH_CHECK_REQUEST_CODE = 203
 
-        private const val NOTIFICATION_ID = 7502
+        const val NOTIFICATION_ID = 7502
         private const val ACTION_HEALTH_CHECK = "com.aikotelematics.HEALTH_CHECK_ACTION"
         private const val CHANNEL_ID = "activity_recognition_channel"
         private const val SILENT_CHANNEL_ID = "activity_recognition_silent_channel"

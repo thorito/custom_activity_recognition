@@ -3,6 +3,7 @@ package com.aikotelematics.custom_activity_recognition
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -464,6 +465,8 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
     fun stopTracking(callback: (Boolean) -> Unit) {
         val intent = Intent(context, ActivityRecognitionService::class.java)
         val stopped = context.stopService(intent)
+
+        clearNotification()
         callback(stopped)
     }
 
@@ -472,6 +475,16 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
             context,
             permission
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun clearNotification() {
+        try {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(ActivityRecognitionService.NOTIFICATION_ID)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing notification: ${e.message}")
+        }
     }
 
     private fun hasRequiredPermissions(): Boolean {

@@ -1,5 +1,6 @@
-## 0.0.26
+## 0.0.27
 
+* Removed notification on stop listening.
 * Fixed errors in Result type.
 
 ## 0.0.23
