@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.aikotelematics.custom_activity_recognition.Constants.ACTION_WAKEUP
 import com.aikotelematics.custom_activity_recognition.Constants.TAG
 import com.aikotelematics.custom_activity_recognition.Constants.UPDATE_ACTIVITY
@@ -242,8 +243,14 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
         }
 
         if (ActivityRecognitionService.isRunning()) {
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
+                try {
+                    ContextCompat.startForegroundService(context, serviceIntent)
+                } catch (e: IllegalStateException) {
+                    Log.e(TAG, "Error starting foreground service: ${e.message}", e)
+                    context.startService(serviceIntent)
+                }
             } else {
                 context.startService(serviceIntent)
             }
@@ -261,7 +268,12 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
             }
 
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
+                try {
+                    ContextCompat.startForegroundService(context, serviceIntent)
+                } catch (e: IllegalStateException) {
+                    Log.e(TAG, "Error starting foreground service: ${e.message}", e)
+                    context.startService(serviceIntent)
+                }
             } else {
                 context.startService(serviceIntent)
             }
