@@ -16,10 +16,6 @@
 
     <application>
 
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
-
         <receiver
             android:name=".ActivityRecognitionReceiver"
             android:exported="false">
