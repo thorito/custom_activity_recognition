@@ -179,11 +179,11 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         }
 
         if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            missingPermissions.add("fine_location")
+            missingPermissions.add("location_precise")
         }
 
         if (!hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)) {
-            missingPermissions.add("coarse_location")
+            missingPermissions.add("location_reduced")
         }
 
         if (SDK_INT >= VERSION_CODES.TIRAMISU && !hasPermission(Manifest.permission.POST_NOTIFICATIONS)) {
@@ -191,7 +191,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         }
 
         if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-            missingPermissions.add("background_location")
+            missingPermissions.add("location_always")
         }
 
         callback(missingPermissions)
