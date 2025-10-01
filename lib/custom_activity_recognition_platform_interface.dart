@@ -28,6 +28,12 @@ abstract class CustomActivityRecognitionPlatform extends PlatformInterface {
         'checkPermissionStatus() has not been implemented.');
   }
 
+  /// Get missing permissions
+  Future<List<String>> getMissingPermissions() {
+    throw UnimplementedError(
+        'getMissingPermissions() has not been implemented.');
+  }
+
   /// Requests permissions for activity recognition
   Future<bool> requestPermissions() {
     throw UnimplementedError('requestPermissions() has not been implemented.');

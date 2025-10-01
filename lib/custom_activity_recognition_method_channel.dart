@@ -42,6 +42,22 @@ class MethodChannelCustomActivityRecognition
     }
   }
 
+  /// Get missing permissions
+  @override
+  Future<List<String>> getMissingPermissions() async {
+    try {
+      final result =
+          await _methodChannel.invokeMethod('getMissingPermissions');
+      if (result == null) return [];
+      return List<String>.from(result as List);
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print('Error getting missing permissions: ${e.message}');
+      }
+      return [];
+    }
+  }
+
   /// Checks if activity recognition is available
   @override
   Future<bool> requestPermissions() async {

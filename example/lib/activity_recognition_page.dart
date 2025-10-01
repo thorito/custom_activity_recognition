@@ -23,6 +23,7 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
   bool _isTracking = false;
   String _currentActivity = "UNKNOWN";
   DateTime? _lastUpdate;
+  List<String> _missingPermissions = [];
 
   @override
   void initState() {
@@ -70,6 +71,19 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
                       _buildPermissionStatusItem(
                           'Permission', _permissionStatus),
                       _buildStatusItem('Tracking', _isTracking),
+                      if (_missingPermissions.isNotEmpty) ...[
+                        SizedBox(height: 8),
+                        Text('Missing Permissions:',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange)),
+                        SizedBox(height: 4),
+                        ..._missingPermissions.map((permission) => Padding(
+                              padding: const EdgeInsets.only(left: 8, top: 2),
+                              child: Text('• $permission',
+                                  style: TextStyle(fontSize: 12)),
+                            )),
+                      ],
                     ],
                   ),
                 ),
@@ -157,10 +171,16 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
     if (isAvailable) {
       final status = await _activityRecognition.checkPermissionStatus();
 
+      final missingPermissions =
+          await _activityRecognition.getMissingPermissions();
+
       setState(() {
         _isAvailable = isAvailable;
         _permissionStatus = status;
+        _missingPermissions = missingPermissions;
       });
+
+      debugPrint('Missing permissions: $missingPermissions');
 
       if (status.isGranted) {
         _setupActivityStream();
@@ -190,10 +210,13 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
         debugPrint('Permission granted: $isGranted');
 
         status = await _activityRecognition.checkPermissionStatus();
+        final missingPermissions =
+            await _activityRecognition.getMissingPermissions();
 
         if (mounted) {
           setState(() {
             _permissionStatus = status;
+            _missingPermissions = missingPermissions;
             _isRequestingPermissions = false;
           });
         }

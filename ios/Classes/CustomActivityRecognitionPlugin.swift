@@ -39,6 +39,8 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
       switch call.method {
       case "checkPermissionStatus":
           checkPermissionStatus(result: result)
+      case "getMissingPermissions":
+          getMissingPermissions(result: result)
       case "requestPermissions":
           requestPermissions(result: result)
       case "startTracking":
@@ -87,6 +89,39 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
                     }
                 } else {
                     result("AUTHORIZED")
+                }
+            }
+        }
+    }
+  }
+
+  private func getMissingPermissions(result: @escaping FlutterResult) {
+    guard isRunningOnSimulator || CMMotionActivityManager.isActivityAvailable() else {
+        result([])
+        return
+    }
+
+    if #available(iOS 11.0, *) {
+        let status = CMMotionActivityManager.authorizationStatus()
+
+        switch status {
+        case .authorized:
+            result([])
+        case .denied, .restricted, .notDetermined:
+            result(["activity_recognition"])
+        @unknown default:
+            result(["activity_recognition"])
+        }
+    } else {
+        let endDate = Date()
+        let startDate = endDate.addingTimeInterval(-1000)
+
+        activityManager.queryActivityStarting(from: startDate, to: endDate, to: OperationQueue.main) { [weak self] (activities, error) in
+            DispatchQueue.main.async {
+                if let error = error as NSError? {
+                    result(["activity_recognition"])
+                } else {
+                    result([])
                 }
             }
         }

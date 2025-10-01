@@ -22,6 +22,10 @@ class CustomActivityRecognition {
   Future<CustomActivityPermissionStatus> checkPermissionStatus() async =>
       await CustomActivityRecognitionPlatform.instance.checkPermissionStatus();
 
+  /// Get missing permissions
+  Future<List<String>> getMissingPermissions() async =>
+      await CustomActivityRecognitionPlatform.instance.getMissingPermissions();
+
   /// Requests permissions for activity recognition
   Future<bool> requestPermissions() async =>
       await CustomActivityRecognitionPlatform.instance.requestPermissions();

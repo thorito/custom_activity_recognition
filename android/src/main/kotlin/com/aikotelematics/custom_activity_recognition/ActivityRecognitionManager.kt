@@ -149,6 +149,34 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
         callback("AUTHORIZED")
     }
 
+    fun getMissingPermissions(activity: Activity, callback: (List<String>) -> Unit) {
+        activityReference = WeakReference(activity)
+
+        val missingPermissions = mutableListOf<String>()
+
+        if (!hasPermission(Manifest.permission.ACTIVITY_RECOGNITION)) {
+            missingPermissions.add("activity_recognition")
+        }
+
+        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            missingPermissions.add("fine_location")
+        }
+
+        if (!hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            missingPermissions.add("coarse_location")
+        }
+
+        if (SDK_INT >= VERSION_CODES.TIRAMISU && !hasPermission(Manifest.permission.POST_NOTIFICATIONS)) {
+            missingPermissions.add("notifications")
+        }
+
+        if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            missingPermissions.add("background_location")
+        }
+
+        callback(missingPermissions)
+    }
+
     fun requestPermissions(activity: Activity, callback: (Boolean) -> Unit) {
         activityReference = WeakReference(activity)
         permissionCallback = callback

@@ -1,3 +1,7 @@
+## 0.0.13
+
+* Get missing permissions.
+
 ## 0.0.12
 
 * Silent notification on android.

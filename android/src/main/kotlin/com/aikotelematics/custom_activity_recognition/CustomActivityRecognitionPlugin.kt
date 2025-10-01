@@ -65,6 +65,17 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
           }
         } ?: result.error("NO_ACTIVITY", "Activity is not available", null)
       }
+      "getMissingPermissions" -> {
+        activity?.let {
+          activityRecognitionManager.getMissingPermissions(it) { status ->
+            try {
+              result.success(status)
+            } catch (e: Exception) {
+              Log.e(TAG, "Error en getMissingPermissions callback: ${e.message}")
+            }
+          }
+        } ?: result.error("NO_ACTIVITY", "Activity is not available", null)
+      }
       "requestPermissions" -> {
         activity?.let {
           pendingResult = result
