@@ -4,19 +4,17 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.annotation.NonNull
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.DefaultLifecycleObserver
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Contants.TAG
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
-import io.flutter.embedding.engine.plugins.lifecycle.HiddenLifecycleReference
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.BinaryMessenger
 
 /** CustomActivityRecognitionPlugin */
 class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -26,9 +24,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
   private var activity: Activity? = null
   private lateinit var activityRecognitionManager: ActivityRecognitionManager
   private var binaryMessenger: BinaryMessenger? = null
-  private var pendingResult: Result? = null
-
-  private val TAG = "CustomActivityRecognitionPlugin"
+  private var pendingResult: MethodChannel.Result? = null
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     context = flutterPluginBinding.applicationContext
@@ -52,7 +48,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
     binaryMessenger = null
   }
 
-  override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+  override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {
     when (call.method) {
       "checkPermissionStatus" -> {
         activity?.let {
@@ -60,7 +56,7 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
             try {
               result.success(status)
             } catch (e: Exception) {
-              Log.e(TAG, "Error en checkPermissionStatus callback: ${e.message}")
+                Log.e(TAG, "Error on checkPermissionStatus callback: ${e.message}, status: $status")
             }
           }
         } ?: result.error("NO_ACTIVITY", "Activity is not available", null)
@@ -97,10 +93,10 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
       }
       "startTracking" -> {
         val showNotification = call.argument<Boolean>("showNotification") ?: true
-        val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: true
+        val useTransitionRecognition = call.argument<Boolean>("useTransitionRecognition") ?: false
         val useActivityRecognition = call.argument<Boolean>("useActivityRecognition") ?: true
-        val detectionIntervalMillis = call.argument<Int>("detectionIntervalMillis") ?: 10000
-        val confidenceThreshold = call.argument<Int>("confidenceThreshold") ?: 50
+        val detectionIntervalMillis = call.argument<Int>("detectionIntervalMillis") ?: DEFAULT_DETECTION_INTERVAL_MILLIS
+        val confidenceThreshold = call.argument<Int>("confidenceThreshold") ?: DEFAULT_CONFIDENCE_THRESHOLD
 
         activityRecognitionManager.startTracking(
           showNotification = showNotification,
@@ -144,11 +140,11 @@ class CustomActivityRecognitionPlugin: FlutterPlugin, MethodCallHandler, Activit
         true
       } catch (e: Exception) {
         Log.e(TAG, "Error en handlePermissionResult: ${e.message}")
-        pendingResult?.let {
+        pendingResult?.let { result ->
           try {
-            it.error("PERMISSION_ERROR", "Error processing permission result", e.message)
+            result.error("PERMISSION_ERROR", "Error processing permission result", e.message)
           } catch (e2: Exception) {
-            Log.e(TAG, "Error al enviar error al pendingResult: ${e2.message}")
+            Log.e(TAG, "Error send pendingResult: ${e2.message}")
           } finally {
             pendingResult = null
           }

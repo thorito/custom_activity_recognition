@@ -9,12 +9,15 @@ Activity recognition plugin for Android (**Activity Recognition Transition API**
 ## Getting started
 
 To use this plugin, add flutter_activity_recognition as a dependency in your pubspec.yaml file. 
-[Show video](https://youtube.com/shorts/vkVThDpTyk8?feature=share)
+
+## Demo
+
+[Show video](https://youtube.com/shorts/ue3rZyVhpw0)
 
 For example:
 ```yaml
   dependencies:
-    custom_activity_recognition: ^0.0.11
+    custom_activity_recognition: ^latest
 ```
 
 * Android
@@ -22,24 +25,37 @@ For example:
 
 ```
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 ```
 
 Allow to enable or disable the hybrid model (only for Android).
 
+If you need to detect activity switching in both the foreground and background, I recommend:
+`useTransitionRecognition = true, useActivityRecognition = true`
+
+If you need to detect activity switching only in the foreground, I recommend:
+`useTransitionRecognition = true, useActivityRecognition = false`
+
 ```dart
   // CustomActivityRecognition.instance.startTracking() 
-  // useTransitionRecognition = true, useActivityRecognition = false
+  // useTransitionRecognition = true, useActivityRecognition = true
 
   CustomActivityRecognition.instance.startTracking(
     showNotification: true,
-    useTransitionRecognition: false,
-    useActivityRecognition: true,
+    useTransitionRecognition: true,
+useActivityRecognition: true,
     detectionIntervalMillis: 10000,
-    confidenceThreshold: 50,
+confidenceThreshold: 60,
   );
 ```
 

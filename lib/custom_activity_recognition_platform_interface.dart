@@ -1,4 +1,5 @@
 import 'package:custom_activity_recognition/activity_types.dart';
+import 'package:custom_activity_recognition/constants.dart';
 import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -43,9 +44,9 @@ abstract class CustomActivityRecognitionPlatform extends PlatformInterface {
   Future<bool> startTracking({
     bool showNotification = true,
     bool useTransitionRecognition = true,
-    bool useActivityRecognition = false,
-    int detectionIntervalMillis = 10000,
-    int confidenceThreshold = 50,
+    bool useActivityRecognition = true,
+    int detectionIntervalMillis = defaultDetectionIntervalMillis,
+    int confidenceThreshold = defaultConfidenceThreshold,
   }) {
     throw UnimplementedError('startTracking() has not been implemented.');
   }

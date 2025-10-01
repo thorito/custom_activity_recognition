@@ -1,0 +1,1 @@
+/Users/thorito/development/flutter/proyects/work/erictel/custom_activity_recognition/example/build/app/intermediates/cxx/Debug/7172d6n1/obj/arm64-v8a

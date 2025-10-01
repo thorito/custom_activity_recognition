@@ -1,0 +1,20 @@
+{
+  "buildFiles": [
+    "/Users/thorito/.puro/envs/last/flutter/packages/flutter_tools/gradle/src/main/groovy/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Volumes/data/development/android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/thorito/development/flutter/proyects/work/erictel/custom_activity_recognition/example/android/app/.cxx/Debug/7172d6n1/armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Volumes/data/development/android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/thorito/development/flutter/proyects/work/erictel/custom_activity_recognition/example/android/app/.cxx/Debug/7172d6n1/armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {}
+}

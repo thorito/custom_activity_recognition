@@ -1,113 +1,204 @@
 package com.aikotelematics.custom_activity_recognition
 
+import android.annotation.SuppressLint
 import android.app.*
-import android.content.Intent
-import android.os.IBinder
-import androidx.core.app.NotificationCompat
-import android.os.Build
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.os.IBinder
+import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.aikotelematics.custom_activity_recognition.Contants.ACTION_WAKEUP
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
+import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
+import com.aikotelematics.custom_activity_recognition.Contants.TAG
+import com.aikotelematics.custom_activity_recognition.Contants.UPDATE_ACTIVITY
 import com.google.android.gms.location.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.content.pm.ServiceInfo
-import android.os.PowerManager
-import android.graphics.Color
 
 class ActivityRecognitionService : Service() {
 
     companion object {
-        private var isServiceRunning = false
-        private var isActivityRecognitionConfigured = false
-        private var isTransitionRecognitionConfigured = false
-        private const val ACTIVITY_REQUEST_CODE = 100
-        private const val TRANSITION_REQUEST_CODE = 200
-        private const val TAG = "ActivityService"
-        private const val NOTIFICATION_ID = 4321
+        private const val ACTIVITY_REQUEST_CODE = 200
+        private const val TRANSITION_REQUEST_CODE = 201
+        private const val WAKEUP_REQUEST_CODE = 202
+        private const val HEALTH_CHECK_REQUEST_CODE = 203
+
+        private const val NOTIFICATION_ID = 7502
+        private const val ACTION_HEALTH_CHECK = "com.aikotelematics.HEALTH_CHECK_ACTION"
         private const val CHANNEL_ID = "activity_recognition_channel"
         private const val SILENT_CHANNEL_ID = "activity_recognition_silent_channel"
 
-        var confidenceThreshold: Int = 50
-        fun isRunning() = isServiceRunning
-    }
+        private const val WAKEUP_INTERVAL = 5 * 60 * 1000L // 5 minutes
+        private const val WAKELOCK_TIMEOUT = 5 * 60 * 1000L // 5 minutes
+        private const val HEALTH_CHECK_INTERVAL = 30 * 60 * 1000L // 30 minutes
+        private var isServiceRunning = false
 
-    private var wakeLock: PowerManager.WakeLock? = null
-    private lateinit var activityRecognitionClient: ActivityRecognitionClient
-    private var showNotification: Boolean = true
-    private var useTransitionRecognition: Boolean = true
-    private var useActivityRecognition: Boolean = false
-    private var detectionIntervalMillis: Int = 10000
-    private var activityIntent: PendingIntent? = null
-    private var transitionIntent: PendingIntent? = null
-    private var currentActivity: String = "UNKNOWN"
-    private var timestamp: Long = 0
-    private val handler = Handler(Looper.getMainLooper())
-    private val healthCheckRunnable = object : Runnable {
-        override fun run() {
-            scheduleServiceHealthCheck()
-            handler.postDelayed(this, 15 * 60 * 1000) // Check every 15 minutes
+        private var isTransitionRecognitionConfigured = false
+        private var healthCheckIntent: PendingIntent? = null
+        private var isActivityRecognitionConfigured = false
+        var detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS
+
+        var confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD
+        fun isRunning() = isServiceRunning
+
+        fun scheduleNextHealthCheck(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, ActivityRecognitionHealthReceiver::class.java).apply {
+                action = ACTION_HEALTH_CHECK
+            }
+
+            healthCheckIntent?.let { pending ->
+                alarmManager.cancel(pending)
+                Log.d(TAG, "Health check alarm cancelled")
+            }
+
+            healthCheckIntent = PendingIntent.getBroadcast(
+                context,
+                HEALTH_CHECK_REQUEST_CODE,
+                intent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+            )
+
+            healthCheckIntent?.let { pending ->
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    try {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                            SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
+                            pending
+                        )
+                        Log.d(TAG, "Next health check scheduled in $HEALTH_CHECK_INTERVAL ms")
+                    } catch (e: SecurityException) {
+                        Log.e(TAG, "SecurityException scheduling health check: ${e.message}")
+                        alarmManager.setInexactRepeating(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                            SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
+                            HEALTH_CHECK_INTERVAL,
+                            pending
+                        )
+                    }
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
+                        pending
+                    )
+                    Log.d(TAG, "Next health check scheduled in $HEALTH_CHECK_INTERVAL ms (pre-M)")
+                }
+            }
         }
     }
 
+    private lateinit var alarmManager: AlarmManager
+    private lateinit var activityRecognitionClient: ActivityRecognitionClient
+    private lateinit var notificationManager: NotificationManager
+    private lateinit var powerManager: PowerManager
+    private lateinit var handler: android.os.Handler
+
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var showNotification: Boolean = true
+    private var useTransitionRecognition: Boolean = true
+    private var useActivityRecognition: Boolean = true
+    private var activityIntent: PendingIntent? = null
+    private var transitionIntent: PendingIntent? = null
+    private var wakeupIntent: PendingIntent? = null
+    private var currentActivity: String = "UNKNOWN"
+    private var timestamp: Long = 0
+
+    @SuppressLint("InlinedApi")
     override fun onCreate() {
         super.onCreate()
         activityRecognitionClient = ActivityRecognition.getClient(this)
         isServiceRunning = true
 
-        createNotificationChannel()
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-            } else {
-                startForeground(NOTIFICATION_ID, createNotification())
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting foreground service: ${e.message}")
-        }
+        notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        handler = android.os.Handler(android.os.Looper.getMainLooper())
 
-        handler.postDelayed(healthCheckRunnable, 5 * 60 * 1000) // Check every 5 minutes
+        createNotificationChannel()
+        setupWakeupAlarm()
+        setupHealthCheck()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand: ${intent?.action}")
 
-        showNotification = intent?.getBooleanExtra("showNotification", true) ?: true
+        if (intent?.action == ACTION_WAKEUP) {
+            handleWakeup()
+            scheduleNextWakeup()
+            scheduleNextHealthCheck(this)
+            return START_STICKY
+        }
 
-        if (!isTransitionRecognitionConfigured) {
-            useTransitionRecognition = intent?.getBooleanExtra("useTransitionRecognition", false) ?: false
-            if (useTransitionRecognition) {
-                acquireWakeLock()
-                setupTransitionRecognition()
-                isTransitionRecognitionConfigured = true
-            }
+        if (intent != null && intent.hasExtra("showNotification")) {
+            showNotification = intent.getBooleanExtra("showNotification", true)
+        }
+
+        if (intent != null && intent.hasExtra("useTransitionRecognition")) {
+            useTransitionRecognition = intent.getBooleanExtra("useTransitionRecognition", true)
+        }
+
+        if (intent != null && intent.hasExtra("useActivityRecognition")) {
+            useActivityRecognition = intent.getBooleanExtra("useActivityRecognition", true)
+        }
+
+        if (intent != null && intent.hasExtra("detectionIntervalMillis")) {
+            detectionIntervalMillis = intent.getIntExtra("detectionIntervalMillis", DEFAULT_DETECTION_INTERVAL_MILLIS)
+        }
+
+        if (intent != null && intent.hasExtra("confidenceThreshold")) {
+            confidenceThreshold = intent.getIntExtra("confidenceThreshold", DEFAULT_CONFIDENCE_THRESHOLD)
         }
 
         if (!isActivityRecognitionConfigured) {
-            useActivityRecognition =
-                intent?.getBooleanExtra("useActivityRecognition", true) ?: true
-            detectionIntervalMillis =
-                intent?.getIntExtra("detectionIntervalMillis", 0) ?: 0
-            confidenceThreshold = intent?.getIntExtra("confidenceThreshold", 50) ?: 50
-
-
-            if (useActivityRecognition) {
-                acquireWakeLock()
-                setupActivityRecognition()
-                isActivityRecognitionConfigured = true
-            }
+            Log.d(
+                TAG, "onStartCommand: ${intent?.action}, " +
+                        "showNotification: $showNotification, " +
+                        "useTransitionRecognition: $useTransitionRecognition, " +
+                        "useActivityRecognition: $useActivityRecognition, " +
+                        "detectionIntervalMillis: $detectionIntervalMillis, " +
+                        "confidenceThreshold: $confidenceThreshold"
+            )
         }
 
-        Log.d(TAG, "onStartCommand: ${intent?.action}, " +
-                "useTransitionRecognition: $useTransitionRecognition, " +
-                "useActivityRecognition: $useActivityRecognition, " +
-                "detectionIntervalMillis: $detectionIntervalMillis, " +
-                "confidenceThreshold: $confidenceThreshold")
+        if (!isTransitionRecognitionConfigured && useTransitionRecognition) {
+            setupTransitionRecognition()
+            isTransitionRecognitionConfigured = true
+        }
+
+        if (!isActivityRecognitionConfigured && useActivityRecognition) {
+            setupActivityRecognition()
+            isActivityRecognitionConfigured = true
+        }
 
         when (intent?.action) {
-            "UPDATE_ACTIVITY" -> {
+            UPDATE_ACTIVITY -> {
                 var changes = false
+
                 val activityExtra = intent.getStringExtra("activity") ?: "UNKNOWN"
                 val timestampExtra = intent.getLongExtra("timestamp", 0)
                 if (timestampExtra > 0 && timestampExtra != timestamp) {
@@ -131,32 +222,167 @@ class ActivityRecognitionService : Service() {
         return START_STICKY
     }
 
-    private fun scheduleServiceHealthCheck() {
-        if (!isServiceRunning) {
-            return
+    override fun onDestroy() {
+
+        cancelCheckHealthAlarm()
+        cancelWakeupAlarm()
+        cleanupRecognition()
+
+        notificationManager.cancel(NOTIFICATION_ID)
+
+        releaseWakeLock()
+        handler.removeCallbacksAndMessages(null)
+
+        isServiceRunning = false
+        isActivityRecognitionConfigured = false
+        isTransitionRecognitionConfigured = false
+
+        Log.d(TAG, "Service destroyed")
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "onTaskRemoved - ensuring wakeup alarm continues")
+
+        scheduleNextWakeup()
+        scheduleNextHealthCheck(this)
+    }
+
+    private fun setupWakeupAlarm() {
+        val intent = Intent(this, ActivityRecognitionService::class.java).apply {
+            action = ACTION_WAKEUP
         }
 
-        Log.d(TAG, "Performing service health check")
+        wakeupIntent = PendingIntent.getService(
+            this,
+            WAKEUP_REQUEST_CODE,
+            intent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+        )
 
-        // Verificar estado de las configuraciones
+        scheduleNextWakeup()
+    }
+
+    private fun scheduleNextWakeup() {
+        wakeupIntent?.let { pending ->
+            val triggerTime = SystemClock.elapsedRealtime() + WAKEUP_INTERVAL
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val canSchedule = alarmManager.canScheduleExactAlarms()
+                        if (!canSchedule) {
+                            Log.e(TAG, "Exact alarms cannot be set")
+                            alarmManager.setInexactRepeating(
+                                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                                triggerTime,
+                                WAKEUP_INTERVAL,
+                                pending
+                            )
+                            return
+                        }
+                    }
+
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerTime,
+                        pending
+                    )
+                } catch (se: SecurityException) {
+                    Log.e(TAG, "SecurityException: ${se.message}")
+
+                    alarmManager.setInexactRepeating(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        triggerTime,
+                        WAKEUP_INTERVAL,
+                        pending
+                    )
+                }
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerTime,
+                    pending
+                )
+            }
+
+            Log.d(TAG, "Next wakeup scheduled in $WAKEUP_INTERVAL ms")
+        }
+    }
+
+    private fun cancelWakeupAlarm() {
+        wakeupIntent?.let { pending ->
+            alarmManager.cancel(pending)
+            Log.d(TAG, "Wakeup alarm cancelled")
+        }
+    }
+
+    private fun cancelCheckHealthAlarm() {
+        healthCheckIntent?.let { pending ->
+            alarmManager.cancel(pending)
+            Log.d(TAG, "Health check alarm cancelled")
+        }
+    }
+
+    private fun handleWakeup() {
+        Log.d(TAG, "Wakeup alarm triggered")
+
+        acquireWakeLock()
+
+        try {
+            ensureRecognitionIsActive()
+
+            updateNotification()
+
+            // Loguear estado del sistema
+            logDeviceState()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during wakeup handling: ${e.message}")
+        } finally {
+            handler.postDelayed({
+                releaseWakeLock()
+            }, 5000)
+        }
+    }
+
+    private fun ensureRecognitionIsActive() {
         if (useTransitionRecognition && !isTransitionRecognitionConfigured) {
-            Log.d(TAG, "Reinitializing transition recognition")
+            Log.d(TAG, "Re-configuring transition recognition")
             setupTransitionRecognition()
+            isTransitionRecognitionConfigured = true
         }
 
         if (useActivityRecognition && !isActivityRecognitionConfigured) {
-            Log.d(TAG, "Reinitializing activity recognition")
+            Log.d(TAG, "Re-configuring activity recognition")
             setupActivityRecognition()
+            isActivityRecognitionConfigured = true
         }
-
-        updateNotification()
     }
 
-    override fun onDestroy() {
+    private fun logDeviceState() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Log.d(TAG, "Device idle mode: ${powerManager.isDeviceIdleMode}")
+            Log.d(TAG, "Battery optimization ignored: ${isIgnoringBatteryOptimizations()}")
+        }
+    }
 
-        handler.removeCallbacks(healthCheckRunnable)
-        releaseWakeLock()
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            powerManager.isIgnoringBatteryOptimizations(packageName)
+        } else {
+            true
+        }
+    }
 
+    private fun cleanupRecognition() {
         activityIntent?.let { pending ->
             activityRecognitionClient.removeActivityUpdates(pending)
                 .addOnCompleteListener {
@@ -169,23 +395,10 @@ class ActivityRecognitionService : Service() {
                     Log.d(TAG, "Transition updates removed")
                 }
         }
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(NOTIFICATION_ID)
-
-        isServiceRunning = false
-        isActivityRecognitionConfigured = false
-        isTransitionRecognitionConfigured = false
-        Log.d(TAG, "Service destroyed")
-        super.onDestroy()
     }
-
-    override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
             val normalChannel = NotificationChannel(
                 CHANNEL_ID,
                 "Activity Recognition",
@@ -242,16 +455,17 @@ class ActivityRecognitionService : Service() {
         if (showNotification) {
             builder.setContentTitle("Activity Recognition")
                 .setContentText("$currentActivity$timestampFormatted")
-                .setSmallIcon(android.R.drawable.ic_menu_compass)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                .setOngoing(true)
+                .setAutoCancel(false)
         } else {
             builder.setContentTitle("")
                 .setContentText("")
-                .setSmallIcon(android.R.drawable.ic_menu_compass)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setPriority(NotificationCompat.PRIORITY_MIN)
                 .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-                .setColor(Color.TRANSPARENT)
                 .setOngoing(true)
                 .setSilent(true)
         }
@@ -265,13 +479,14 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun updateNotification() {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, createNotification())
     }
 
     private fun setupTransitionRecognition() {
         Log.d(TAG, "setupTransitionRecognition")
         val intent = Intent(this, ActivityRecognitionReceiver::class.java)
+        intent.action = "com.aikotelematics.activity_transition"
+
         transitionIntent = PendingIntent.getBroadcast(
             this,
             TRANSITION_REQUEST_CODE,
@@ -294,6 +509,7 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun initTransitionRequest() {
+        acquireWakeLock()
         val transitions = mutableListOf<ActivityTransition>()
 
         val activityTypes = listOf(
@@ -329,6 +545,7 @@ class ActivityRecognitionService : Service() {
     private fun setupActivityRecognition() {
         Log.d(TAG, "setupActivityRecognition")
         val intent = Intent(this, ActivityRecognitionReceiver::class.java)
+        intent.action = "com.aikotelematics.activity_recognition"
         activityIntent = PendingIntent.getBroadcast(
             this,
             ACTIVITY_REQUEST_CODE,
@@ -351,7 +568,11 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun initActivityUpdates() {
-        activityRecognitionClient.requestActivityUpdates(detectionIntervalMillis.toLong(), activityIntent!!)
+        acquireWakeLock()
+        activityRecognitionClient.requestActivityUpdates(
+            detectionIntervalMillis.toLong(),
+            activityIntent!!
+        )
             .addOnSuccessListener {
                 Log.d(TAG, "requestActivityUpdates success")
                 releaseWakeLock()
@@ -364,7 +585,6 @@ class ActivityRecognitionService : Service() {
 
     private fun acquireWakeLock() {
         if (wakeLock == null) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "ActivityRecognition:WakeLock"
@@ -373,7 +593,8 @@ class ActivityRecognitionService : Service() {
         }
 
         if (wakeLock?.isHeld == false) {
-            wakeLock?.acquire(3 * 60 * 1000L) // 3 minutes
+            wakeLock?.acquire(WAKELOCK_TIMEOUT)
+            Log.d(TAG, "WakeLock acquired")
         }
     }
 
@@ -382,6 +603,7 @@ class ActivityRecognitionService : Service() {
             wakeLock?.let {
                 if (it.isHeld) {
                     it.release()
+                    Log.d(TAG, "WakeLock released")
                 }
             }
         } catch (e: Exception) {
@@ -389,4 +611,21 @@ class ActivityRecognitionService : Service() {
         }
     }
 
+    private fun setupHealthCheck() {
+        val intent = Intent(this, ActivityRecognitionHealthReceiver::class.java)
+        intent.action = ACTION_HEALTH_CHECK
+
+        healthCheckIntent = PendingIntent.getBroadcast(
+            this,
+            HEALTH_CHECK_REQUEST_CODE,
+            intent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+        )
+
+        scheduleNextHealthCheck(this)
+    }
 }

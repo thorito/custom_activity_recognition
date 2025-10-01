@@ -22,6 +22,9 @@ extension CustomActivityPermissionStatusExtension
   /// permission dialog will not be shown when requesting this permission.
   bool get isPermanentlyDenied =>
       this == CustomActivityPermissionStatus.permanentlyDenied;
+
+  bool get isNotDetermined =>
+      this == CustomActivityPermissionStatus.notDetermined;
 }
 
 extension PermissionStatusExtension on CustomActivityPermissionStatus {
