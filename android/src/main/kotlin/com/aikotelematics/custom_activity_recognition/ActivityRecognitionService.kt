@@ -132,9 +132,8 @@ class ActivityRecognitionService : Service() {
         handler = android.os.Handler(android.os.Looper.getMainLooper())
 
         createNotificationChannel()
-        setupWakeupAlarm()
-        setupHealthCheck()
 
+        // Start foreground BEFORE setting up alarms and health checks
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Determine foreground service type based on available permissions
             val hasActivityRecognition = ContextCompat.checkSelfPermission(
@@ -156,6 +155,10 @@ class ActivityRecognitionService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, createNotification())
         }
+
+        // Setup alarms and health checks AFTER becoming foreground
+        setupWakeupAlarm()
+        setupHealthCheck()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
