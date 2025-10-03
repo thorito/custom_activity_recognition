@@ -34,9 +34,7 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
   @override
   Future<void> dispose() async {
     WidgetsBinding.instance.removeObserver(this);
-    if (_isTracking) {
-      await _activityRecognition.stopTracking();
-    }
+    // Don't stop tracking in dispose - service should continue in background
     super.dispose();
   }
 

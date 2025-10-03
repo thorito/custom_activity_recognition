@@ -174,7 +174,7 @@ class ActivityRecognitionManager(private val context: Context) : EventChannel.St
 
         val missingPermissions = mutableListOf<String>()
 
-        if (!hasPermission(Manifest.permission.ACTIVITY_RECOGNITION)) {
+        if (SDK_INT >= VERSION_CODES.Q && !hasPermission(Manifest.permission.ACTIVITY_RECOGNITION)) {
             missingPermissions.add("activity_recognition")
         }
 

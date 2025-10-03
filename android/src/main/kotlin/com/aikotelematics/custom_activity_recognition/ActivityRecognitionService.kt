@@ -1,9 +1,11 @@
 package com.aikotelematics.custom_activity_recognition
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -11,6 +13,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.aikotelematics.custom_activity_recognition.Contants.ACTION_WAKEUP
 import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_CONFIDENCE_THRESHOLD
 import com.aikotelematics.custom_activity_recognition.Contants.DEFAULT_DETECTION_INTERVAL_MILLIS
@@ -133,11 +136,22 @@ class ActivityRecognitionService : Service() {
         setupHealthCheck()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Determine foreground service type based on available permissions
+            val hasActivityRecognition = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+
+            val foregroundServiceType = if (hasActivityRecognition) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            }
+
             startForeground(
                 NOTIFICATION_ID,
                 createNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                foregroundServiceType
             )
         } else {
             startForeground(NOTIFICATION_ID, createNotification())

@@ -25,16 +25,19 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "📡 BroadcastReceiver.onReceive - action: ${intent.action}")
 
         when {
             ActivityTransitionResult.hasResult(intent) -> {
+                Log.d(TAG, "📍 Has ActivityTransitionResult")
                 handleTransitionResult(context, ActivityTransitionResult.extractResult(intent))
             }
             ActivityRecognitionResult.hasResult(intent) -> {
+                Log.d(TAG, "🏃 Has ActivityRecognitionResult")
                 handleActivityResult(context, ActivityRecognitionResult.extractResult(intent))
             }
             else -> {
-                Log.d(TAG, "Intent received with no recognizable result")
+                Log.d(TAG, "⚠️ Intent received with no recognizable result - action: ${intent.action}")
             }
         }
 

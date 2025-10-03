@@ -273,7 +273,7 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
       showNotification: true,
       useTransitionRecognition: false,
       useActivityRecognition: true,
-      detectionIntervalMillis: 0,
+      detectionIntervalMillis: 5000,
       confidenceThreshold: 50,
     );
 
