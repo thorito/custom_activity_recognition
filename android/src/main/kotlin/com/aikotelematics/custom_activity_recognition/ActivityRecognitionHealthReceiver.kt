@@ -1,11 +1,14 @@
 package com.aikotelematics.custom_activity_recognition
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import com.aikotelematics.custom_activity_recognition.ActivityRecognitionService.Companion.scheduleNextHealthCheck
 import com.aikotelematics.custom_activity_recognition.Contants.TAG
 
@@ -18,6 +21,11 @@ class ActivityRecognitionHealthReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         Log.d(TAG, "Received intent with action: $action")
+
+        if (!hasLocationPermissions(context)) {
+            Log.e(TAG, "Cannot restart service - missing location permissions")
+            return
+        }
 
         if (action != ACTION_HEALTH_CHECK) {
             Log.d(TAG, "Ignoring intent with unexpected action: $action")
@@ -63,5 +71,16 @@ class ActivityRecognitionHealthReceiver : BroadcastReceiver() {
                 }
             }
         }
+    }
+
+    private fun hasLocationPermissions(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
     }
 }

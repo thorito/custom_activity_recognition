@@ -133,6 +133,12 @@ class ActivityRecognitionService : Service() {
 
         createNotificationChannel()
 
+        if (!hasLocationPermissions()) {
+            Log.e(TAG, "Service cannot start - missing location permissions")
+            stopSelf()
+            return
+        }
+
         // Start foreground BEFORE setting up alarms and health checks
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Determine foreground service type based on available permissions
@@ -285,6 +291,17 @@ class ActivityRecognitionService : Service() {
         )
 
         scheduleNextWakeup()
+    }
+
+    private fun hasLocationPermissions(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun scheduleNextWakeup() {

@@ -1,10 +1,13 @@
 package com.aikotelematics.custom_activity_recognition
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 import com.aikotelematics.custom_activity_recognition.Contants.ACTION_WAKEUP
 import com.aikotelematics.custom_activity_recognition.Contants.TAG
 import com.aikotelematics.custom_activity_recognition.Contants.UPDATE_ACTIVITY
@@ -27,6 +30,11 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "📡 BroadcastReceiver.onReceive - action: ${intent.action}")
 
+        if (!hasLocationPermissions(context)) {
+            Log.e(TAG, "Cannot start service - missing location permissions")
+            return
+        }
+
         when {
             ActivityTransitionResult.hasResult(intent) -> {
                 Log.d(TAG, "📍 Has ActivityTransitionResult")
@@ -42,6 +50,17 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
         }
 
         checkAndWakeupService(context)
+    }
+
+    private fun hasLocationPermissions(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun handleTransitionResult(context: Context, result: ActivityTransitionResult?) {
