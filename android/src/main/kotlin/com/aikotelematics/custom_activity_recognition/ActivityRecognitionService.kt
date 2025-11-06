@@ -76,6 +76,18 @@ class ActivityRecognitionService : Service() {
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            if (!alarmManager.canScheduleExactAlarms()) {
+                                Log.w(TAG, "Cannot schedule exact alarms. Using inexact repeating for health check.")
+                                alarmManager.setInexactRepeating(
+                                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                                    SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
+                                    HEALTH_CHECK_INTERVAL,
+                                    pending
+                                )
+                                return@let
+                            }
+                        }
                         alarmManager.setExactAndAllowWhileIdle(
                             AlarmManager.ELAPSED_REALTIME_WAKEUP,
                             SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
