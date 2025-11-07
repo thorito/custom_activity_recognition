@@ -145,33 +145,43 @@ class ActivityRecognitionService : Service() {
 
         createNotificationChannel()
 
-        if (!hasLocationPermissions()) {
-            Log.e(TAG, "Service cannot start - missing location permissions")
+        // Check if we have at least location or activity recognition permissions
+        val hasLocation = hasLocationPermissions()
+        val hasActivityRecognition = hasActivityRecognitionPermission()
+
+        if (!hasLocation && !hasActivityRecognition) {
+            Log.e(TAG, "Service cannot start - missing both location and activity recognition permissions")
             stopSelf()
             return
         }
 
+        // Log available permissions for debugging
+        Log.d(TAG, "Starting service with permissions - Location: $hasLocation, ActivityRecognition: $hasActivityRecognition")
+
         // Start foreground BEFORE setting up alarms and health checks
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Determine foreground service type based on available permissions
-            val hasActivityRecognition = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACTIVITY_RECOGNITION
-            ) == PackageManager.PERMISSION_GRANTED
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val foregroundServiceType = determineForegroundServiceType()
+                Log.d(TAG, "Starting foreground service with type: $foregroundServiceType")
 
-            val foregroundServiceType = if (hasActivityRecognition) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    foregroundServiceType
+                )
             } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                startForeground(NOTIFICATION_ID, createNotification())
             }
-
-            startForeground(
-                NOTIFICATION_ID,
-                createNotification(),
-                foregroundServiceType
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, createNotification())
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException when starting foreground service: ${e.message}")
+            Log.e(TAG, "Location permission granted: $hasLocation")
+            Log.e(TAG, "Activity Recognition permission granted: $hasActivityRecognition")
+            stopSelf()
+            return
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected exception when starting foreground service: ${e.message}")
+            stopSelf()
+            return
         }
 
         // Setup alarms and health checks AFTER becoming foreground
@@ -314,6 +324,39 @@ class ActivityRecognitionService : Service() {
                     this,
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasActivityRecognitionPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Not required before Android 10
+        }
+    }
+
+    private fun determineForegroundServiceType(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return 0 // No service type needed before Android 10
+        }
+
+        val hasLocation = hasLocationPermissions()
+        val hasActivityRecognition = hasActivityRecognitionPermission()
+
+        return when {
+            hasLocation && hasActivityRecognition ->
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+            hasLocation ->
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            hasActivityRecognition ->
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+            else -> {
+                Log.w(TAG, "No required permissions available for foreground service")
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH // Fallback to health type
+            }
+        }
     }
 
     private fun scheduleNextWakeup() {
