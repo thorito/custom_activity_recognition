@@ -268,21 +268,28 @@ class ActivityRecognitionService : Service() {
     }
 
     override fun onDestroy() {
+        Log.d(TAG, "Service onDestroy - cleaning up all resources")
 
+        // Cancel all alarms first
         cancelCheckHealthAlarm()
         cancelWakeupAlarm()
+
+        // Clean up activity recognition subscriptions
         cleanupRecognition()
 
+        // Cancel notification
         notificationManager.cancel(NOTIFICATION_ID)
 
+        // Release wake lock and clear handlers
         releaseWakeLock()
         handler.removeCallbacksAndMessages(null)
 
+        // Update service state
         isServiceRunning = false
         isActivityRecognitionConfigured = false
         isTransitionRecognitionConfigured = false
 
-        Log.d(TAG, "Service destroyed")
+        Log.d(TAG, "Service destroyed - all resources cleaned up")
         super.onDestroy()
     }
 
@@ -408,16 +415,28 @@ class ActivityRecognitionService : Service() {
 
     private fun cancelWakeupAlarm() {
         wakeupIntent?.let { pending ->
-            alarmManager.cancel(pending)
-            Log.d(TAG, "Wakeup alarm cancelled")
+            try {
+                alarmManager.cancel(pending)
+                pending.cancel()
+                Log.d(TAG, "Wakeup alarm cancelled and PendingIntent cancelled")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cancelling wakeup alarm: ${e.message}")
+            }
         }
+        wakeupIntent = null
     }
 
     private fun cancelCheckHealthAlarm() {
         healthCheckIntent?.let { pending ->
-            alarmManager.cancel(pending)
-            Log.d(TAG, "Health check alarm cancelled")
+            try {
+                alarmManager.cancel(pending)
+                pending.cancel()
+                Log.d(TAG, "Health check alarm cancelled and PendingIntent cancelled")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cancelling health check alarm: ${e.message}")
+            }
         }
+        healthCheckIntent = null
     }
 
     private fun handleWakeup() {
@@ -472,18 +491,43 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun cleanupRecognition() {
+        Log.d(TAG, "Cleaning up activity recognition subscriptions")
+
+        // Remove activity updates
         activityIntent?.let { pending ->
-            activityRecognitionClient.removeActivityUpdates(pending)
-                .addOnCompleteListener {
-                    Log.d(TAG, "Activity updates removed")
-                }
+            try {
+                activityRecognitionClient.removeActivityUpdates(pending)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Activity updates removed successfully")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Failed to remove activity updates: ${e.message}")
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception removing activity updates: ${e.message}")
+            }
         }
+
+        // Remove transition updates
         transitionIntent?.let { pending ->
-            activityRecognitionClient.removeActivityTransitionUpdates(pending)
-                .addOnCompleteListener {
-                    Log.d(TAG, "Transition updates removed")
-                }
+            try {
+                activityRecognitionClient.removeActivityTransitionUpdates(pending)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Transition updates removed successfully")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Failed to remove transition updates: ${e.message}")
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception removing transition updates: ${e.message}")
+            }
         }
+
+        // Nullify the pending intents to ensure they can't be used again
+        activityIntent = null
+        transitionIntent = null
+
+        Log.d(TAG, "Activity recognition cleanup completed")
     }
 
     private fun createNotificationChannel() {
