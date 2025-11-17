@@ -427,16 +427,47 @@ class ActivityRecognitionService : Service() {
     }
 
     private fun cancelCheckHealthAlarm() {
-        healthCheckIntent?.let { pending ->
-            try {
+        try {
+            // Cancel using companion object's healthCheckIntent
+            healthCheckIntent?.let { pending ->
+                try {
+                    alarmManager.cancel(pending)
+                    pending.cancel()
+                    Log.d(TAG, "Health check alarm cancelled from companion object")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error cancelling health check alarm from companion: ${e.message}")
+                }
+            }
+
+            // Also create and cancel a new PendingIntent with same parameters to ensure cleanup
+            val intent = Intent(this, ActivityRecognitionHealthReceiver::class.java).apply {
+                action = ACTION_HEALTH_CHECK
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                HEALTH_CHECK_REQUEST_CODE,
+                intent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_NO_CREATE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_NO_CREATE
+                }
+            )
+
+            pendingIntent?.let { pending ->
                 alarmManager.cancel(pending)
                 pending.cancel()
-                Log.d(TAG, "Health check alarm cancelled and PendingIntent cancelled")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error cancelling health check alarm: ${e.message}")
+                Log.d(TAG, "Health check alarm cancelled using FLAG_NO_CREATE")
             }
+
+            // Set companion object's healthCheckIntent to null
+            healthCheckIntent = null
+
+            Log.d(TAG, "Health check alarm fully cancelled and cleaned up")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during health check alarm cancellation: ${e.message}")
         }
-        healthCheckIntent = null
     }
 
     private fun handleWakeup() {
