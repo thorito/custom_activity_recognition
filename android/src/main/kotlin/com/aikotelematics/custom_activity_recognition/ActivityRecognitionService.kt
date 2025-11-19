@@ -193,6 +193,18 @@ class ActivityRecognitionService : Service() {
         Log.d(TAG, "onStartCommand: ${intent?.action}")
 
         if (intent?.action == ACTION_WAKEUP) {
+            // Validate that Flutter process is alive before processing wakeup
+            if (!shouldProcessWakeup()) {
+                Log.w(
+                    TAG,
+                    "onStartCommand: Flutter process is dead or tracker not registered, " +
+                            "stopping service to prevent unwanted restart after force-stop"
+                )
+                stopSelf()
+                return START_NOT_STICKY
+            }
+
+            Log.d(TAG, "onStartCommand: Wakeup validation passed, processing wakeup")
             handleWakeup()
             scheduleNextWakeup()
             scheduleNextHealthCheck(this)
@@ -791,5 +803,94 @@ class ActivityRecognitionService : Service() {
         )
 
         scheduleNextHealthCheck(this)
+    }
+
+    /**
+     * Validates whether the service should process a wakeup action.
+     * This prevents the service from running when the Flutter process is dead
+     * (e.g., after adb stop-app or system force-stop).
+     */
+    private fun shouldProcessWakeup(): Boolean {
+        // Check 1: Is tracker registered in SharedPreferences?
+        if (!isTrackerRegistered()) {
+            Log.d(TAG, "shouldProcessWakeup: Tracker not registered")
+            return false
+        }
+
+        // Check 2: Is Flutter process alive?
+        if (!isFlutterProcessAlive()) {
+            Log.d(TAG, "shouldProcessWakeup: Flutter process is NOT alive")
+            return false
+        }
+
+        // Check 3: Are internal Flutter services running?
+        // This is important because only having external services running (like this one)
+        // without internal Flutter services means the app was force-stopped
+        if (!hasInternalForegroundServices()) {
+            Log.d(TAG, "shouldProcessWakeup: No internal Flutter services running")
+            return false
+        }
+
+        Log.d(TAG, "shouldProcessWakeup: All checks passed")
+        return true
+    }
+
+    private fun isTrackerRegistered(): Boolean {
+        return try {
+            val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            prefs.getBoolean("flutter.isTrackerRegistered", false)
+        } catch (e: Exception) {
+            Log.e(TAG, "shouldProcessWakeup: Error reading isTrackerRegistered", e)
+            false
+        }
+    }
+
+    private fun isFlutterProcessAlive(): Boolean {
+        return try {
+            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val packageName = this.packageName
+            val runningProcesses = activityManager.runningAppProcesses ?: return false
+
+            for (processInfo in runningProcesses) {
+                if (processInfo.processName == packageName) {
+                    Log.d(TAG, "shouldProcessWakeup: Flutter process is alive")
+                    return true
+                }
+            }
+
+            Log.d(TAG, "shouldProcessWakeup: Flutter process is NOT alive")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "shouldProcessWakeup: Error checking Flutter process", e)
+            false
+        }
+    }
+
+    private fun hasInternalForegroundServices(): Boolean {
+        return try {
+            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val runningServices = activityManager.getRunningServices(Integer.MAX_VALUE)
+
+            val internalServices = listOf(
+                "com.pravera.flutter_foreground_task.service.ForegroundService",
+                "com.dexterous.flutterlocalnotifications.ForegroundService"
+            )
+
+            if (runningServices != null) {
+                for (service in runningServices) {
+                    val serviceClassName = service.service.className
+                    if (service.foreground && internalServices.contains(serviceClassName)) {
+                        Log.d(TAG, "shouldProcessWakeup: Found internal service: $serviceClassName")
+                        return true
+                    }
+                }
+            }
+
+            Log.d(TAG, "shouldProcessWakeup: No internal Flutter services are active")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "shouldProcessWakeup: Error checking services", e)
+            false
+        }
     }
 }
