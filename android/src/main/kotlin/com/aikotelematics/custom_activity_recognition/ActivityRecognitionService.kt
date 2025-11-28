@@ -78,7 +78,10 @@ class ActivityRecognitionService : Service() {
                     try {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             if (!alarmManager.canScheduleExactAlarms()) {
-                                Log.w(TAG, "Cannot schedule exact alarms. Using inexact repeating for health check.")
+                                Log.w(
+                                    TAG,
+                                    "Cannot schedule exact alarms. Using inexact repeating for health check."
+                                )
                                 alarmManager.setInexactRepeating(
                                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
                                     SystemClock.elapsedRealtime() + HEALTH_CHECK_INTERVAL,
@@ -150,13 +153,19 @@ class ActivityRecognitionService : Service() {
         val hasActivityRecognition = hasActivityRecognitionPermission()
 
         if (!hasLocation && !hasActivityRecognition) {
-            Log.e(TAG, "Service cannot start - missing both location and activity recognition permissions")
+            Log.e(
+                TAG,
+                "Service cannot start - missing both location and activity recognition permissions"
+            )
             stopSelf()
             return
         }
 
         // Log available permissions for debugging
-        Log.d(TAG, "Starting service with permissions - Location: $hasLocation, ActivityRecognition: $hasActivityRecognition")
+        Log.d(
+            TAG,
+            "Starting service with permissions - Location: $hasLocation, ActivityRecognition: $hasActivityRecognition"
+        )
 
         // Start foreground BEFORE setting up alarms and health checks
         try {
@@ -224,11 +233,13 @@ class ActivityRecognitionService : Service() {
         }
 
         if (intent != null && intent.hasExtra("detectionIntervalMillis")) {
-            detectionIntervalMillis = intent.getIntExtra("detectionIntervalMillis", DEFAULT_DETECTION_INTERVAL_MILLIS)
+            detectionIntervalMillis =
+                intent.getIntExtra("detectionIntervalMillis", DEFAULT_DETECTION_INTERVAL_MILLIS)
         }
 
         if (intent != null && intent.hasExtra("confidenceThreshold")) {
-            confidenceThreshold = intent.getIntExtra("confidenceThreshold", DEFAULT_CONFIDENCE_THRESHOLD)
+            confidenceThreshold =
+                intent.getIntExtra("confidenceThreshold", DEFAULT_CONFIDENCE_THRESHOLD)
         }
 
         if (!isActivityRecognitionConfigured) {
@@ -367,10 +378,13 @@ class ActivityRecognitionService : Service() {
         return when {
             hasLocation && hasActivityRecognition ->
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+
             hasLocation ->
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+
             hasActivityRecognition ->
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+
             else -> {
                 Log.w(TAG, "No required permissions available for foreground service")
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH // Fallback to health type
@@ -492,7 +506,6 @@ class ActivityRecognitionService : Service() {
 
             updateNotification()
 
-            // Loguear estado del sistema
             logDeviceState()
 
         } catch (e: Exception) {
@@ -686,6 +699,13 @@ class ActivityRecognitionService : Service() {
 
     private fun initTransitionRequest() {
         acquireWakeLock()
+
+        if (transitionIntent == null) {
+            Log.e(TAG, "initTransitionRequest: transitionIntent is null, cannot request updates")
+            releaseWakeLock()
+            return
+        }
+
         val transitions = mutableListOf<ActivityTransition>()
 
         val activityTypes = listOf(
@@ -745,6 +765,13 @@ class ActivityRecognitionService : Service() {
 
     private fun initActivityUpdates() {
         acquireWakeLock()
+
+        if (activityIntent == null) {
+            Log.e(TAG, "initActivityUpdates: activityIntent is null, cannot request updates")
+            releaseWakeLock()
+            return
+        }
+
         activityRecognitionClient.requestActivityUpdates(
             detectionIntervalMillis.toLong(),
             activityIntent!!
