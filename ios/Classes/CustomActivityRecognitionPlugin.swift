@@ -148,12 +148,9 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 
               activityManager.queryActivityStarting(from: startDate, to: endDate, to: OperationQueue.main) { (activities, error) in
                   DispatchQueue.main.async {
-                      if error != nil {
-                          result(false)
-                      } else {
-                          // If no error, permissions were granted (query succeeded)
-                          result(true)
-                      }
+                      // Check actual permission status after dialog dismissal
+                      let currentStatus = CMMotionActivityManager.authorizationStatus()
+                      result(currentStatus == .authorized)
                   }
               }
           @unknown default:
