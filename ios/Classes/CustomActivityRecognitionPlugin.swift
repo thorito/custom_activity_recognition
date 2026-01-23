@@ -148,18 +148,11 @@ public class CustomActivityRecognitionPlugin: NSObject, FlutterPlugin {
 
               activityManager.queryActivityStarting(from: startDate, to: endDate, to: OperationQueue.main) { (activities, error) in
                   DispatchQueue.main.async {
-                      if let error = error as NSError? {
-                          if error.domain == CMErrorDomain && error.code == 105 {
-                              result(false)
-                          } else {
-                              result(false)
-                          }
+                      if error != nil {
+                          result(false)
                       } else {
-                          if CMMotionActivityManager.authorizationStatus() == .authorized {
-                              result(true)
-                          } else {
-                              result(false)
-                          }
+                          // If no error, permissions were granted (query succeeded)
+                          result(true)
                       }
                   }
               }
