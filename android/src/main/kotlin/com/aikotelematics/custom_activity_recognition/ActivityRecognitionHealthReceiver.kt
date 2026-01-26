@@ -40,8 +40,8 @@ class ActivityRecognitionHealthReceiver : BroadcastReceiver() {
         wakeLock.acquire(WAKELOCK_TIMEOUT)
 
         try {
-            if (!ActivityRecognitionService.isRunning()) {
-                Log.d(TAG, "Service not running, restarting")
+            if (!ActivityRecognitionService.isRunning(context)) {
+                Log.d(TAG, "Service not running (verified with ActivityManager), restarting")
 
                 val serviceIntent = Intent(context, ActivityRecognitionService::class.java)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -49,8 +49,6 @@ class ActivityRecognitionHealthReceiver : BroadcastReceiver() {
                 } else {
                     context.startService(serviceIntent)
                 }
-            } else {
-                Log.d(TAG, "Service running correctly")
             }
 
             scheduleNextHealthCheck(context)

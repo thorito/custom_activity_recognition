@@ -48,6 +48,34 @@ class ActivityRecognitionService : Service() {
         var detectionIntervalMillis: Int = DEFAULT_DETECTION_INTERVAL_MILLIS
 
         var confidenceThreshold: Int = DEFAULT_CONFIDENCE_THRESHOLD
+
+        /**
+         * Checks if the service is actually running using ActivityManager.
+         * This is more reliable than using a static variable which can become stale
+         * if the process is killed by the system.
+         */
+        fun isRunning(context: Context): Boolean {
+            if (!isServiceRunning) {
+                return false
+            }
+
+            return try {
+                val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                @Suppress("DEPRECATION")
+                val runningServices = activityManager.getRunningServices(Integer.MAX_VALUE)
+
+                runningServices?.any { serviceInfo ->
+                    serviceInfo.service.className == ActivityRecognitionService::class.java.name &&
+                    serviceInfo.foreground
+                } ?: false
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking service state: ${e.message}")
+                // Fall back to static variable if ActivityManager fails
+                isServiceRunning
+            }
+        }
+
+        @Deprecated("Use isRunning(context) instead for reliable state checking")
         fun isRunning() = isServiceRunning
 
         fun scheduleNextHealthCheck(context: Context) {
@@ -200,6 +228,8 @@ class ActivityRecognitionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand: ${intent?.action}")
+
+        ensureForeground()
 
         if (intent?.action == ACTION_WAKEUP) {
             // Validate that Flutter process is alive before processing wakeup
@@ -669,6 +699,28 @@ class ActivityRecognitionService : Service() {
 
     private fun updateNotification() {
         notificationManager.notify(NOTIFICATION_ID, createNotification())
+    }
+
+    /**
+     * Ensures the service is in foreground state.
+     * This is called at the start of onStartCommand to prevent ForegroundServiceDidNotStartInTimeException.
+     * Safe to call multiple times - Android handles duplicate startForeground calls gracefully.
+     */
+    private fun ensureForeground() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val foregroundServiceType = determineForegroundServiceType()
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    foregroundServiceType
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in ensureForeground: ${e.message}")
+        }
     }
 
     private fun setupTransitionRecognition() {

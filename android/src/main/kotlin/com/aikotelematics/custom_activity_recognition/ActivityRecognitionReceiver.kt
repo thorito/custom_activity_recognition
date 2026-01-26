@@ -149,20 +149,21 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
             putExtra("timestamp", timestamp)
         }
 
-        if (ActivityRecognitionService.isRunning()) {
+        if (ActivityRecognitionService.isRunning(context)) {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent)
             } else {
                 context.startService(serviceIntent)
             }
         } else {
+            Log.d(TAG, "Service not running (verified with ActivityManager), waking it up...")
             checkAndWakeupService(context)
         }
     }
 
     private fun checkAndWakeupService(context: Context) {
-        if (!ActivityRecognitionService.isRunning()) {
-            Log.d(TAG, "📢 The service is not running, waking it up...")
+        if (!ActivityRecognitionService.isRunning(context)) {
+            Log.d(TAG, "📢 The service is not running (verified with ActivityManager), waking it up...")
 
             val serviceIntent = Intent(context, ActivityRecognitionService::class.java).apply {
                 action = ACTION_WAKEUP
