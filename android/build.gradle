@@ -1,19 +1,6 @@
 group = "com.aikotelematics.custom_activity_recognition"
 version = "1.0-SNAPSHOT"
 
-buildscript {
-    ext.kotlin_version = "2.2.0"
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.13.0")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
-    }
-}
-
 allprojects {
     repositories {
         google()
@@ -22,7 +9,6 @@ allprojects {
 }
 
 apply plugin: "com.android.library"
-apply plugin: "kotlin-android"
 
 android {
     if (project.android.hasProperty("namespace")) {
@@ -50,7 +36,6 @@ android {
     }
 
     dependencies {
-        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
         implementation 'androidx.core:core-ktx:1.10.0'
         implementation 'com.google.android.gms:play-services-location:21.3.0'
         testImplementation("org.jetbrains.kotlin:kotlin-test")
