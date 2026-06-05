@@ -1,3 +1,10 @@
+## 0.0.18
+
+* **Android**: Updated to Gradle 8.14, AGP 8.11.1, Built-in Kotlin 2.2.20.
+* **Android**: Removed explicit Kotlin Gradle Plugin (KGP) from plugin build.
+* **iOS**: Migrated from CocoaPods to Swift Package Manager.
+* **iOS**: Removed `custom_activity_recognition.podspec`.
+
 ## 0.0.13
 
 * Get missing permissions.
