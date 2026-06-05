@@ -150,11 +150,7 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
         }
 
         if (ActivityRecognitionService.isRunning(context)) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
+            startServiceSafely(context, serviceIntent)
         } else {
             Log.d(TAG, "Service not running (verified with ActivityManager), waking it up...")
             checkAndWakeupService(context)
@@ -169,11 +165,24 @@ class ActivityRecognitionReceiver : BroadcastReceiver() {
                 action = ACTION_WAKEUP
             }
 
+            startServiceSafely(context, serviceIntent)
+        }
+    }
+
+    private fun startServiceSafely(context: Context, intent: Intent) {
+        try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
+                context.startForegroundService(intent)
             } else {
-                context.startService(serviceIntent)
+                context.startService(intent)
             }
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "Cannot start foreground service (app in background): ${e.message}")
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startService(intent)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting service: ${e.message}")
         }
     }
 }
