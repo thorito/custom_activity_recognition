@@ -1,4 +1,4 @@
-import 'package:app_settings/app_settings.dart';
+//import 'package:app_settings/app_settings.dart';
 import 'package:custom_activity_recognition/activity_types.dart';
 import 'package:custom_activity_recognition/custom_activity_permission_status.dart';
 import 'package:custom_activity_recognition/custom_activity_recognition.dart';
@@ -306,7 +306,7 @@ class _ActivityRecognitionPageState extends State<ActivityRecognitionPage>
           TextButton(
             onPressed: () async {
               Navigator.of(context).pop();
-              await AppSettings.openAppSettings();
+              //await AppSettings.openAppSettings();
             },
             child: Text('Open Settings'),
           ),
