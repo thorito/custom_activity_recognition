@@ -176,6 +176,32 @@ class ActivityRecognitionService : Service() {
 
         createNotificationChannel()
 
+        // Start foreground IMMEDIATELY to prevent ForegroundServiceDidNotStartInTimeException.
+        // This MUST be called before any stopSelf() to satisfy the system requirement
+        // when started via startForegroundService().
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val foregroundServiceType = determineForegroundServiceType()
+                Log.d(TAG, "Starting foreground service with type: $foregroundServiceType")
+
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    foregroundServiceType
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException when starting foreground service: ${e.message}")
+            stopSelf()
+            return
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected exception when starting foreground service: ${e.message}")
+            stopSelf()
+            return
+        }
+
         // Check if we have at least location or activity recognition permissions
         val hasLocation = hasLocationPermissions()
         val hasActivityRecognition = hasActivityRecognitionPermission()
@@ -194,32 +220,6 @@ class ActivityRecognitionService : Service() {
             TAG,
             "Starting service with permissions - Location: $hasLocation, ActivityRecognition: $hasActivityRecognition"
         )
-
-        // Start foreground BEFORE setting up alarms and health checks
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val foregroundServiceType = determineForegroundServiceType()
-                Log.d(TAG, "Starting foreground service with type: $foregroundServiceType")
-
-                startForeground(
-                    NOTIFICATION_ID,
-                    createNotification(),
-                    foregroundServiceType
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, createNotification())
-            }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException when starting foreground service: ${e.message}")
-            Log.e(TAG, "Location permission granted: $hasLocation")
-            Log.e(TAG, "Activity Recognition permission granted: $hasActivityRecognition")
-            stopSelf()
-            return
-        } catch (e: Exception) {
-            Log.e(TAG, "Unexpected exception when starting foreground service: ${e.message}")
-            stopSelf()
-            return
-        }
 
         // Setup alarms and health checks AFTER becoming foreground
         setupWakeupAlarm()
