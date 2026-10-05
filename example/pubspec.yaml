@@ -13,7 +13,7 @@ dependencies:
   custom_activity_recognition:
     path: ../
 
-  cupertino_icons: ^1.0.9
+  cupertino_icons: ^2.0.0
 
 dev_dependencies:
   flutter_test:

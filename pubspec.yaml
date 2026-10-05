@@ -1,6 +1,6 @@
 name: custom_activity_recognition
 description: "This plugin is used to recognize user activity transition on Android and iOS platforms."
-version: 0.0.18+10
+version: 0.0.18+11
 
 homepage: https://github.com/thorito/custom_activity_recognition
 issue_tracker: https://github.com/thorito/custom_activity_recognition/issues?q=is%3Aissue+is%3Aopen
@@ -10,7 +10,7 @@ environment:
   flutter: '>=3.41.0'
 
 dependencies:
-  equatable: ^2.0.8
+  equatable: ^3.0.0
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.1.8
