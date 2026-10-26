@@ -4,6 +4,7 @@
 * **Android**: Removed explicit Kotlin Gradle Plugin (KGP) from plugin build.
 * **iOS**: Migrated from CocoaPods to Swift Package Manager.
 * **iOS**: Removed `custom_activity_recognition.podspec`.
+* upgrade equatable to 3.0.0
 
 ## 0.0.13
 
